@@ -36,3 +36,4 @@ __pycache__/
 # Misc
 tmp/
 History
+build/
