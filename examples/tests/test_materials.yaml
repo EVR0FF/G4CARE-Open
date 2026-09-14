@@ -1,0 +1,36 @@
+# ── Тест: materials — пользовательские материалы ──
+EVENTS: 1
+VISUALIZATION: false
+
+GEOMETRY:
+  WORLD:
+    shape: "box"
+    material: "G4_AIR"
+    DIMENSIONS: ["1*m", "1*m", "1*m"]
+  OBJECTS:
+    custom_box:
+      name: "CustomBox"
+      shape: "box"
+      material: "MyWater"
+      DIMENSIONS: ["10*cm", "10*cm", "10*cm"]
+      POSITION: [0, 0, 0]
+      isSensitive: true
+
+materials:
+  MyWater:
+    name: "MyWater"
+    density: "1.0*g/cm3"
+    state: "liquid"
+    elements:
+      H:
+        name: "H"
+        Z: 1
+        abundance: 0.6667
+      O:
+        name: "O"
+        Z: 8
+        abundance: 0.3333
+
+PHYSICS:
+  BASIC:
+    LIST: "QGSP_BERT_EMV"

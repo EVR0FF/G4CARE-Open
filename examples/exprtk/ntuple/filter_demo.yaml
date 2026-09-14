@@ -1,0 +1,96 @@
+# Тест NTUPLES: заполнение с фильтрами
+NTHREADS: 1
+OUTPUT_FILE: "filter_demo.root"
+EVENTS: 5
+G4RUNMANAGER_PRINT_PROGRESS: 1
+VISUALIZATION: false
+
+materials:
+  SiAl5050:
+    name: "SiAl5050"
+    density: "2.33*g/cm3"
+    state: "solid"
+    elements:
+      0:
+        name: "Si"
+        Z: 14
+        abundance: 0.5
+      1:
+        name: "Al"
+        Z: 13
+        abundance: 0.5
+
+GEOMETRY:
+  OBJECTS:
+    target:
+      name: "target"
+      shape: "box"
+      material: "SiAl5050"
+      DIMENSIONS: ["10*mm", "10*mm", "10*mm"]
+      POSITION: [0, 0, 0]
+      isSensitive: false
+
+SOURCE_MODE: "flow"
+
+SOURCE:
+  co60:
+    type: "radioactive"
+    object: "target_LV"
+    ISOTOPES:
+      0:
+        name: "Co60"
+        Z: 27
+        A: 60
+        abundance: 1.0
+
+PHYSICS:
+  BASIC:
+    LIST: "FTFP_BERT"
+  ADVANCED:
+    RDECAY:
+      ENABLE: true
+  CUTS:
+    default: "0.1*mm"
+
+NTUPLES: ["primary", "secondary", "g4care", "ion_production"]
+
+NTUPLE:
+  primary:
+    filter: "kinetic_energy > 0.5"
+    columns:
+      - "event_id"
+      - "x"
+      - "y"
+      - "z"
+      - "kinetic_energy"
+      - "volume_name"
+      - "particle_name"
+
+  secondary:
+    filter: "kinetic_energy > 0.1"
+    columns:
+      - "event_id"
+      - "kinetic_energy"
+      - "volume_name"
+      - "particle_name"
+
+  g4care:
+    filter: "edep > 0.01"
+    columns:
+      - "event_id"
+      - "x"
+      - "y"
+      - "z"
+      - "edep"
+      - "kinetic_energy"
+      - "step_length"
+      - "volume_name"
+
+  ion_production:
+    columns:
+      - "event_id"
+      - "x"
+      - "y"
+      - "z"
+      - "kinetic_energy"
+      - "volume_name"

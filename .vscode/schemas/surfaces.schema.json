@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://g4care/schema/surfaces",
+  "title": "surfaces",
+  "description": "Optical surface definitions.",
+  "type": "object",
+  "markdownDescription": "En: Optical surface definitions. Each key is a surface ID.\nRu: Определения оптических поверхностей. Каждый ключ — ID поверхности.\n\nSee: SurfaceManager.cc.\n\nExample:\n```yaml\nsurfaces:\n  target_surf:\n    name: TargetSurface\n    type: border\n    volume: Target\n    properties:\n      reflectivity: 0.95\n```",
+  "patternProperties": {
+    "^.*$": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "markdownDescription": "En: Surface display name.\nRu: Отображаемое имя поверхности."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["border", "surface", "skin"],
+          "default": "border",
+          "markdownDescription": "En: Surface type.\n  `border` — boundary of one volume (dielectric-metal or dielectric-dielectric).\n  `surface` — between two physical volumes.\n  `skin` — logical skin surface.\nRu: Тип поверхности.\n  `border` — граница одного объёма.\n  `surface` — между двумя физическими объёмами.\n  `skin` — логическая поверхность оболочки.\nDefault: `border`."
+        },
+        "volume": {
+          "type": "string",
+          "markdownDescription": "En: Logical volume name for skin surfaces.\nRu: Имя логического объёма для skin-поверхностей."
+        },
+        "phys_volume1": {
+          "type": "string",
+          "markdownDescription": "En: First physical volume for border surfaces.\nRu: Первый физический объём для border-поверхностей."
+        },
+        "phys_volume2": {
+          "type": "string",
+          "markdownDescription": "En: Second physical volume for border surfaces.\nRu: Второй физический объём для border-поверхностей."
+        },
+        "properties": {
+          "type": "object",
+          "description": "Optical surface properties.",
+          "markdownDescription": "En: Optical surface properties (model, finish, type, sigma_alpha, polish, REFLECTIVITY, EFFICIENCY, etc.).\nRu: Оптические свойства поверхности (model, finish, type, sigma_alpha, polish, REFLECTIVITY, EFFICIENCY и др.).\n\nExample:\n```yaml\nproperties:\n  model: unified\n  finish: polished\n  type: dielectric_metal\n  REFLECTIVITY: 0.95\n```"
+        }
+      }
+    }
+  }
+}

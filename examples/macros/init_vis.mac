@@ -1,0 +1,25 @@
+/vis/open OGL
+/vis/drawVolume
+/vis/enable true
+
+/vis/viewer/set/background 1 1 1
+
+/vis/geometry/set/colour clay1 1 0 0
+/vis/geometry/set/colour clay2 1 0 0
+/vis/geometry/set/colour clay3 1 0 0
+/vis/geometry/set/colour water1 0 0 1
+/vis/geometry/set/colour water2 0 0 1
+/vis/geometry/set/colour water3 0 0 1
+/vis/geometry/set/colour water4 0 0 1
+
+/vis/scene/add/axes 0 0 0 10 nm
+/vis/scene/add/scale 2 nm x 0.1 0.85 0.9
+
+/vis/scene/add/text 4 0 0 nm "6.23 nm"
+/vis/scene/add/text 0 6.3 0 nm "10.82 nm"
+/vis/scene/add/text 0 0 4.3 nm "7.68 nm"
+
+/vis/viewer/set/viewpointThetaPhi 30 60 deg
+/vis/viewer/zoom 500
+/vis/scene/add/trajectories smooth
+/vis/scene/endOfEventAction accumulate

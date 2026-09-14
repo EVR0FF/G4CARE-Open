@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://g4care/schema/scoring",
+  "title": "SCORING",
+  "description": "Adaptive scoring mesh / Адаптивный скоринг",
+  "type": "object",
+  "markdownDescription": "En: Adaptive scoring grid for detailed energy deposition analysis.\nRu: Адаптивная скоринг-сетка для детального анализа энерговыделения.\n\nExample / Пример:\n```yaml\nSCORING:\n  TARGET_VOLUME_NAME: \"target_LV\"\n  HALF_SIZE_X: \"5*mm\"\n  HALF_SIZE_Y: \"5*mm\"\n  HALF_SIZE_Z: \"5*mm\"\n  MAX_DEPTH: 8\n  MIN_EVENTS_PER_CELL: 5\n  GRADIENT_THRESHOLD: 0.1\n```",
+  "properties": {
+    "TARGET_VOLUME_NAME": {
+      "type": "string",
+      "default": "World",
+      "markdownDescription": "En: Target logical volume name for adaptive scoring.\nRu: Имя логического объёма мишени.\n\nDefault / По умолчанию: `World`"
+    },
+    "TARGET_VOLUME": {
+      "type": "string",
+      "default": "World",
+      "markdownDescription": "En: Alternative target volume name (backward compat).\nRu: Альтернативное имя мишени (для обратной совместимости).\n\nDefault / По умолчанию: `World`"
+    },
+    "HALF_SIZE_X": {
+      "type": ["number", "string"],
+      "default": "10*cm",
+      "markdownDescription": "En: Half-size along X with units.\nRu: Полуразмер сетки по X с единицами.\n\nDefault / По умолчанию: `10*cm`"
+    },
+    "HALF_SIZE_Y": {
+      "type": ["number", "string"],
+      "default": "10*cm",
+      "markdownDescription": "En: Half-size along Y with units.\nRu: Полуразмер сетки по Y с единицами.\n\nDefault / По умолчанию: `10*cm`"
+    },
+    "HALF_SIZE_Z": {
+      "type": ["number", "string"],
+      "default": "10*cm",
+      "markdownDescription": "En: Half-size along Z with units.\nRu: Полуразмер сетки по Z с единицами.\n\nDefault / По умолчанию: `10*cm`"
+    },
+    "HALF_SIZE": {
+      "type": "array",
+      "items": { "type": ["number", "string"] },
+      "default": ["10*cm", "10*cm", "10*cm"],
+      "minItems": 3, "maxItems": 3,
+      "markdownDescription": "En: Half-sizes [x, y, z] (alternative format).\nRu: Полуразмеры [x, y, z] (альтернативный формат).\n\nExample / Пример: `['10*cm', '10*cm', '10*cm']`"
+    },
+    "MAX_DEPTH": {
+      "type": "integer",
+      "default": 8, "minimum": 1, "maximum": 15,
+      "markdownDescription": "En: Maximum recursion depth (2^depth cells per dimension).\nRu: Максимальная глубина рекурсии.\n\nDefault / По умолчанию: `8`"
+    },
+    "MIN_EVENTS_PER_CELL": {
+      "type": "integer",
+      "default": 50, "minimum": 1,
+      "markdownDescription": "En: Minimum events per cell before splitting.\nRu: Мин. событий в ячейке перед разделением.\n\nDefault / По умолчанию: `50`"
+    },
+    "MIN_EVENTS_SPLIT": {
+      "type": "integer",
+      "default": 50, "minimum": 1,
+      "markdownDescription": "En: Alias for MIN_EVENTS_PER_CELL.\nRu: Альтернативное имя для MIN_EVENTS_PER_CELL.\n\nDefault / По умолчанию: `50`"
+    },
+    "GRADIENT_THRESHOLD": {
+      "type": "number",
+      "default": 0.2, "minimum": 0.0, "maximum": 1.0,
+      "markdownDescription": "En: Gradient threshold for cell splitting.\nRu: Порог градиента для разделения ячейки.\n\nDefault / По умолчанию: `0.2`"
+    },
+    "MIN_EVENTS_MERGE": {
+      "type": "integer",
+      "default": 20, "minimum": 0,
+      "markdownDescription": "En: Minimum events for merging adjacent cells.\nRu: Мин. событий для слияния ячеек.\n\nDefault / По умолчанию: `20`"
+    },
+    "SPLIT_COOLDOWN": {
+      "type": "integer",
+      "default": 10, "minimum": 0,
+      "markdownDescription": "En: Cooldown between splits (events).\nRu: Задержка между разделениями (событий).\n\nDefault / По умолчанию: `10`"
+    },
+    "MERGE_COOLDOWN": {
+      "type": "integer",
+      "default": 50, "minimum": 0,
+      "markdownDescription": "En: Cooldown between merges (events).\nRu: Задержка между слияниями (событий).\n\nDefault / По умолчанию: `50`"
+    },
+    "MIN_EDEP_MEV": {
+      "type": "number",
+      "default": 0.0, "minimum": 0.0,
+      "markdownDescription": "En: Minimum energy deposit (MeV) to consider.\nRu: Мин. энерговыделение (МэВ) для учёта.\n\nDefault / По умолчанию: `0.0`"
+    },
+    "REFINE_INTERVAL": {
+      "type": "integer",
+      "default": 0,
+      "minimum": 0,
+      "markdownDescription": "En: Refinement interval in events. 0 = every event.\nRu: Интервал уточнения в событиях. 0 = каждое событие.\n\nDefault / По умолчанию: `0`"
+    },
+    "MAX_REL_UNCERTAINTY": {
+      "type": "number",
+      "default": 1.0, "minimum": 0.0, "maximum": 1.0,
+      "markdownDescription": "En: Maximum relative uncertainty.\nRu: Макс. относительная неопределённость.\n\nDefault / По умолчанию: `1.0`"
+    },
+    "MAX_TOTAL_NODES": {
+      "type": "integer",
+      "default": 0, "minimum": 0,
+      "markdownDescription": "En: Maximum total nodes. 0 = unlimited.\nRu: Макс. число узлов. 0 = без ограничения.\n\nDefault / По умолчанию: `0`"
+    },
+    "ADAPTIVE": {
+      "type": "object",
+      "description": "Legacy adaptive scoring / Устаревший формат",
+      "markdownDescription": "En: Deprecated — use top-level SCORING keys directly.\nRu: Устаревший формат — используйте ключи на верхнем уровне SCORING.",
+      "properties": {
+        "TARGET_VOLUME_NAME": { "type": "string", "default": "Target" },
+        "HALF_SIZE_X": { "type": ["number", "string"], "default": "10*cm" },
+        "HALF_SIZE_Y": { "type": ["number", "string"], "default": "10*cm" },
+        "HALF_SIZE_Z": { "type": ["number", "string"], "default": "10*cm" },
+        "MAX_DEPTH": { "type": "integer", "default": 8, "minimum": 0, "maximum": 15 },
+        "MIN_EVENTS_PER_CELL": { "type": "integer", "default": 50, "minimum": 1 },
+        "GRADIENT_THRESHOLD": { "type": "number", "default": 0.2, "minimum": 0.0, "maximum": 1.0 },
+        "MIN_EVENTS_MERGE": { "type": "integer", "default": 20, "minimum": 1 },
+        "SPLIT_COOLDOWN": { "type": "integer", "default": 10, "minimum": 0 },
+        "MERGE_COOLDOWN": { "type": "integer", "default": 50, "minimum": 0 },
+        "MIN_EDEP_MEV": { "type": "number", "default": 0.0, "minimum": 0.0 },
+        "MAX_REL_UNCERTAINTY": { "type": "number", "default": 1.0, "minimum": 0.0, "maximum": 1.0 },
+        "MAX_TOTAL_NODES": { "type": "integer", "default": 0, "minimum": 0 }
+      }
+    }
+  }
+}

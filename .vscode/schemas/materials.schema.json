@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://g4care/schema/materials",
+  "title": "materials",
+  "description": "Custom material definitions (inline YAML).",
+  "type": "object",
+  "markdownDescription": "En: Custom material definitions. Each key is a material name with density, state, temperature, pressure, and elemental composition.\nRu: Определения пользовательских материалов. Каждый ключ — имя материала с плотностью, состоянием, температурой, давлением и элементным составом.\n\nSee: MaterialManager.cc.\n\nExample:\n```yaml\nmaterials:\n  SiAl5050:\n    name: \"SiAl5050\"\n    density: \"2.33*g/cm3\"\n    state: \"solid\"\n    elements:\n      Si:\n        Z: 14\n        abundance: 0.5\n      Al:\n        Z: 13\n        abundance: 0.5\n```",
+  "patternProperties": {
+    "^.*$": { "$ref": "definitions.schema.json#/$defs/materialDef" }
+  }
+}

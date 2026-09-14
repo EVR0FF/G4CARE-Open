@@ -1,0 +1,64 @@
+# ── chem3: Химия + ITTrackingInteractivity ──
+# Аналог examples/chem3 — e⁻ 1 keV, сфера 0.3 µm, G4EmDNAPhysics + G4EmDNAChemistry
+# Геометрия: G4Orb радиусом 0.3 µm (как в официальном DetectorConstruction)
+
+NTHREADS: 1
+OUTPUT_FILE: "chem3.root"
+EVENTS: 1
+VISUALIZATION: true
+MACROS:
+  - file: "vis_chem3.mac"
+    stage: "before"
+  - file: "movie_g4care.mac"
+    stage: "after"
+ENABLE_DICTIONARY: false
+RUNACTION_VERBOSE: 1
+GEOMETRY:
+  WORLD:
+    shape: "box"
+    material: "G4_AIR"
+    DIMENSIONS: ["1.0*um", "1.0*um", "1.0*um"]
+
+  OBJECTS:
+    target:
+      name: "target"
+      shape: "sphere"
+      material: "G4_WATER"
+      DIMENSIONS: ["0*um", "0.3*um"]
+      POSITION: [0, 0, 0]
+      isSensitive: true
+      max_step_size: "0"
+
+SOURCE_MODE: "flow"
+SOURCE:
+  e_source:
+    type: "particleGun"
+    particle: "e-"
+    energy: "1.0*keV"
+    direction: { x: 0, y: 0, z: 1 }
+    pos: { x: 0, y: 0, z: 0 }
+
+PHYSICS:
+  BASIC:
+    LIST: ""
+  ADVANCED:
+    EM_DNA:
+      ENABLE: true
+    EM_DNA_CHEM:
+      ENABLE: true
+
+CHEMISTRY:
+  ENABLE: true
+  TIME_STEP_MODEL: "SBS"
+  START_TIME: "1*ps"
+  END_TIME: "100*ns"
+  SPECIES: ["All"]
+  VOLUME:
+    - "target"
+
+NTUPLES: ["g4care", "chem_tracks"]
+NTUPLE:
+  g4care:
+    columns: ["particle_name", "kinetic_energy", "edep", "volume_name", "process_name"]
+  chem_tracks:
+    columns: ["particle_name", "x", "y", "z", "edep", "volume_name"]

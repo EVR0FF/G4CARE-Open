@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://g4care/schema/data",
+  "title": "DATA",
+  "description": "Data Sources / Источники данных",
+  "type": "object",
+  "markdownDescription": "En: External data sources (CSV, ROOT files, RDF) for use in expressions.\nRu: Внешние источники данных (CSV, ROOT-файлы, RDF) для использования в выражениях.\n\nExample / Пример:\n```yaml\nDATA:\n  xenon_table:\n    file: xenon_test.csv\n    delimiter: \",\"\n    header: true\n```",
+  "patternProperties": {
+    "^.*$": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string",
+          "markdownDescription": "En: Path to data file (CSV, ROOT, RDF).\nRu: Путь к файлу данных (CSV, ROOT, RDF)."
+        },
+        "tree": {
+          "type": "string",
+          "default": "tree",
+          "markdownDescription": "En: TTree name (ROOT files only).\nRu: Имя TTree (только для ROOT-файлов).\n\nDefault / По умолчанию: `tree`"
+        },
+        "header": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "En: Whether the CSV has a header row.\nRu: Содержит ли CSV-файл строку заголовков.\n\nDefault / По умолчанию: `true`"
+        },
+        "delimiter": {
+          "type": "string",
+          "default": ",",
+          "markdownDescription": "En: Column delimiter in the CSV file.\nRu: Разделитель столбцов в CSV-файле.\n\nDefault / По умолчанию: `,`"
+        },
+        "skip_first_n": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "markdownDescription": "En: Skip the first N lines of the file.\nRu: Пропустить первые N строк файла.\n\nDefault / По умолчанию: `0`"
+        },
+        "columns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "markdownDescription": "En: Column names (if the file has no header).\nRu: Список имён столбцов (если файл без заголовка)."
+        }
+      }
+    }
+  }
+}

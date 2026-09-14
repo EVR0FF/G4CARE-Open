@@ -1,0 +1,118 @@
+Bootstrap: docker
+From: ubuntu:24.04
+
+%post
+    # System dependencies for Geant4, ROOT, G4CARE
+    apt-get update -y
+    apt-get install -y --no-install-recommends \
+        libtbb-dev \
+        libxerces-c-dev \
+        libexpat1-dev \
+        libgl1-mesa-dri \
+        libglu1-mesa \
+        libglx-mesa0 \
+        libqt6widgets6t64 \
+        libqt6gui6t64 \
+        libqt6core6t64 \
+        libqt6opengl6t64 \
+        libqt6openglwidgets6t64 \
+        qt6-qpa-plugins \
+        libx11-6 \
+        libxmu6 \
+        libxi6 \
+        libglx0 \
+        libopengl0 \
+        libvtk9.1t64 \
+        libvtk9.1t64-qt \
+        libssl-dev \
+        ca-certificates \
+        libglib2.0-0 \
+        libgomp1 \
+        libnuma1 \
+        libpcre2-8-0 \
+        libzstd1 \
+        libxxhash0 \
+        liblz4-1 \
+        liblzma5 \
+        libbz2-1.0 \
+        libfreetype6 \
+        libpng16-16t64 \
+        libjpeg-turbo8 \
+        libgif7 \
+        libtiff6 \
+        libltdl7 \
+        libxft2 \
+        libxpm4 \
+        libafterimage0 \
+        libssl3t64
+
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+
+    # Extract pre-built tars
+    echo "Extracting Geant4..."
+    mkdir -p /opt/geant4
+    tar -xf /tmp/geant4.tar -C /opt/geant4
+    rm -f /tmp/geant4.tar
+
+    echo "Extracting Geant4 data..."
+    mkdir -p /opt/geant4-data
+    tar -xf /tmp/geant4-data.tar -C /opt/geant4-data
+    rm -f /tmp/geant4-data.tar
+
+    echo "Extracting ROOT..."
+    mkdir -p /opt/root
+    tar -xf /tmp/root.tar -C /opt/root
+    rm -f /tmp/root.tar
+
+    # G4CARE directories
+    mkdir -p /opt/g4care /opt/g4care/configs
+
+%files
+    # Pre-built tar archives
+    /tmp/geant4.tar /tmp/geant4.tar
+    /tmp/geant4-data.tar /tmp/geant4-data.tar
+    /tmp/root.tar /tmp/root.tar
+
+    # G4CARE binary
+    /home/ever/GProjects/G4CARE/build/G4CARE /opt/g4care/G4CARE
+
+    # Example YAML configs
+    /home/ever/GProjects/G4CARE/build_asan/*.yaml /opt/g4care/configs/
+
+%environment
+    export GEANT4_DIR=/opt/geant4
+    export PATH=/opt/geant4/bin:/opt/root/bin:/opt/g4care:$PATH
+    export LD_LIBRARY_PATH=/opt/geant4/lib:/opt/root/lib:/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
+
+    # Geant4 data
+    export G4NEUTRONHPDATA=/opt/geant4-data/G4NDL4.7.1
+    export G4LEDATA=/opt/geant4-data/G4EMLOW8.8
+    export G4LEVELGAMMADATA=/opt/geant4-data/PhotonEvaporation6.1.2
+    export G4RADIOACTIVEDATA=/opt/geant4-data/RadioactiveDecay6.1.2
+    export G4PARTICLEXSDATA=/opt/geant4-data/G4PARTICLEXS4.2
+    export G4PIIDATA=/opt/geant4-data/G4PII1.3
+    export G4REALSURFACEDATA=/opt/geant4-data/RealSurface2.2
+    export G4SAIDXSDATA=/opt/geant4-data/G4SAIDDATA2.0
+    export G4ABLADATA=/opt/geant4-data/G4ABLA3.3
+    export G4INCLDATA=/opt/geant4-data/G4INCL1.3
+    export G4ENSDFSTATEDATA=/opt/geant4-data/G4ENSDFSTATE3.0
+    export G4CHANNELINGDATA=/opt/geant4-data/G4CHANNELING2.0
+    export G4PARTICLEHPDATA=/opt/geant4-data/G4TENDL1.4
+    export G4NUDEXLIBDATA=/opt/geant4-data/G4NUDEXLIB1.0
+    export G4URRDATA=/opt/geant4-data/G4URRPT1.1
+
+    # ROOT
+    export ROOTSYS=/opt/root
+    export CMAKE_PREFIX_PATH=/opt/root
+
+    # G4CARE
+    export G4CARE_DIR=/opt/g4care
+
+%runscript
+    exec /opt/g4care/G4CARE "$@"
+
+%labels
+    Author G4CARE Team
+    Version 1.0.0
+    Geant4 11.4.0

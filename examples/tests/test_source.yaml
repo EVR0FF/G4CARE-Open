@@ -1,0 +1,70 @@
+# ── Тест: SOURCE — все типы источников ──
+EVENTS: 10
+VISUALIZATION: false
+
+GEOMETRY:
+  WORLD:
+    shape: "box"
+    material: "G4_AIR"
+    DIMENSIONS: ["1*m", "1*m", "1*m"]
+  OBJECTS:
+    water_box:
+      name: "WaterBox"
+      shape: "box"
+      material: "G4_WATER"
+      DIMENSIONS: ["10*cm", "10*cm", "10*cm"]
+      POSITION: [0, 0, 0]
+      isSensitive: true
+
+SOURCE_MODE: "flow"
+
+SOURCE:
+  e_gun:
+    type: "particleGun"
+    particle: "e-"
+    energy: "1*MeV"
+    direction: { x: 0, y: 0, z: 1 }
+    pos: { x: 0, y: 0, z: "-20*cm" }
+    weight: 0.25
+
+  gamma_gps:
+    type: "gps"
+    particle: "gamma"
+    energy: "662*keV"
+    pos: { x: 0, y: 0, z: "-20*cm" }
+    weight: 0.25
+
+  activation_source:
+    type: "activation"
+    object: "WaterBox"
+    weight: 0.25
+
+  radioactive_source:
+    type: "radioactive"
+    particle: "ion"
+    ISOTOPES:
+      Cs137:
+        name: "Cs137"
+        Z: 55
+        A: 137
+        abundance: 1.0
+    pos: { x: 0, y: 0, z: "-10*cm" }
+    weight: 0.25
+
+  mixed:
+    type: "mixture"
+    weight: 0.25
+    components:
+      gun_part:
+        source: "e_gun"
+        weight: 0.5
+      gps_part:
+        source: "gamma_gps"
+        weight: 0.5
+
+PHYSICS:
+  BASIC:
+    LIST: "QGSP_BERT_EMV"
+  ADVANCED:
+    RDECAY:
+      ENABLE: true

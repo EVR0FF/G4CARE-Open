@@ -1,0 +1,60 @@
+# ── chem2: Химия + TimeStepAction ──
+# Аналог examples/chem2 — p 50 keV, G4EmDNAPhysics + G4EmDNAChemistry
+# Мир 2 µm (как в официальном DetectorConstruction)
+# Минимальный шаг времени через MAX_TIME_STEP (TimeStepAction)
+
+NTHREADS: 12
+OUTPUT_FILE: "chem2.root"
+EVENTS: 1
+VISUALIZATION: false
+ENABLE_DICTIONARY: false
+RUNACTION_VERBOSE: 1
+
+GEOMETRY:
+  WORLD:
+    shape: "box"
+    material: "G4_AIR"
+    DIMENSIONS: ["1*um", "1*um", "1*um"]
+
+  OBJECTS:
+    target:
+      name: "target"
+      shape: "box"
+      material: "G4_WATER"
+      DIMENSIONS: ["1*um", "1*um", "1*um"]
+      POSITION: [0, 0, 0]
+      isSensitive: true
+      max_step_size: "0"
+
+SOURCE_MODE: "flow"
+SOURCE:
+  p_source:
+    type: "particleGun"
+    particle: "proton"
+    energy: "50.0*keV"
+    direction: { x: 0, y: 0, z: 1 }
+    pos: { x: 0, y: 0, z: 0 }
+
+PHYSICS:
+  BASIC:
+    LIST: ""
+  ADVANCED:
+    EM_DNA:
+      ENABLE: true
+    EM_DNA_CHEM:
+      ENABLE: true
+
+CHEMISTRY:
+  ENABLE: true
+  TIME_STEP_MODEL: "SBS"
+  START_TIME: "1*ps"
+  END_TIME: "1*ns"
+  MAX_TIME_STEP: "0.1*ps"
+  SPECIES: ["All"]
+  VOLUME:
+    - "target"
+
+NTUPLES: ["g4care"]
+NTUPLE:
+  g4care:
+    columns: ["particle_name", "kinetic_energy", "edep", "volume_name", "process_name"]

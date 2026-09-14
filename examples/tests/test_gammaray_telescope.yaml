@@ -1,0 +1,115 @@
+# ── GAMMARAY_TELESCOPE: эталонный конфиг 1:1 ──
+# TKR: 15 слоёв × 3 плоскости (Converter_W + DetectorY + DetectorX)
+# Z-позиции как в GammaRayTelDetectorConstruction:
+#   Converter:  -tkrSizeZ/2 + 2*tSi + dViews + convThick/2
+#   DetectorY:  -tkrSizeZ/2 + tSi/2
+#   DetectorX:  -tkrSizeZ/2 + tSi + dViews + tSi/2
+# Пороги из GammaRayTelDigitizer: TKR=120keV, CAL=0, ACD=15keV
+
+EVENTS: 10
+VISUALIZATION: false
+OUTPUT_FILE: "test_gammaray_telescope.root"
+ENABLE_DICTIONARY: false
+
+GEOMETRY:
+  WORLD:
+    shape: "box"
+    material: "G4_Galactic"
+    DIMENSIONS: ["2*m", "2*m", "2*m"]
+  OBJECTS:
+    payload:
+      name: "Payload"
+      shape: "box"
+      material: "G4_Galactic"
+      DIMENSIONS: ["90*cm", "90*cm", "200*cm"]
+      POSITION: [0, 0, 0]
+
+    calorimeter:
+      name: "CAL"
+      shape: "box"
+      material: "G4_CESIUM_IODIDE"
+      DIMENSIONS: ["90*cm", "90*cm", "40*cm"]
+      POSITION: [0, 0, "-80*cm"]
+      mother: "Payload"
+      isSensitive: true
+      DIGITIZE:
+        calorimeter_mode: true
+        threshold: 0
+        digit_type: 1
+        quantum_efficiency: 1.0
+
+    tkr:
+      name: "TKR"
+      shape: "box"
+      material: "G4_Galactic"
+      DIMENSIONS: ["90*cm", "90*cm", "4.8*cm"]
+      POSITION: [0, 0, "-40*cm"]
+      mother: "Payload"
+      REPLICA:
+        axis: "z"
+        count: 15
+        step: "0.3186*cm"
+        offset: 0
+      CHILDREN:
+        converter:
+          name: "Converter"
+          shape: "box"
+          material: "G4_W"
+          DIMENSIONS: ["90*cm", "90*cm", "0.03*cm"]
+          POSITION: [0, 0, "-2*cm"]
+        det_y:
+          name: "TKRDetectorY"
+          shape: "box"
+          material: "G4_Si"
+          DIMENSIONS: ["90*cm", "90*cm", "0.04*cm"]
+          POSITION: [0, 0, "0*cm"]
+          isSensitive: true
+          DIGITIZE:
+            threshold: "120*keV"
+            digit_type: 0
+            quantum_efficiency: 1.0
+        det_x:
+          name: "TKRDetectorX"
+          shape: "box"
+          material: "G4_Si"
+          DIMENSIONS: ["90*cm", "90*cm", "0.04*cm"]
+          POSITION: [0, 0, "0.08*cm"]
+          isSensitive: true
+          DIGITIZE:
+            threshold: "120*keV"
+            digit_type: 0
+            quantum_efficiency: 1.0
+
+    acd:
+      name: "ACD"
+      shape: "box"
+      material: "G4_PLASTIC_SC_VINYLTOLUENE"
+      DIMENSIONS: ["90*cm", "90*cm", "2*cm"]
+      POSITION: [0, 0, "30*cm"]
+      mother: "Payload"
+      isSensitive: true
+      DIGITIZE:
+        threshold: "15*keV"
+        digit_type: 2
+        quantum_efficiency: 1.0
+
+SOURCE:
+  gamma_source:
+    type: "particleGun"
+    particle: "gamma"
+    energy: "1*GeV"
+    direction: { x: 0, y: 0, z: 1 }
+    pos: { x: 0, y: 0, z: "-80*cm" }
+
+NTUPLES: ["g4care", "digits"]
+
+NTUPLE:
+  digits:
+    columns:
+      - energy
+      - detector_id
+      - digit_type
+
+PHYSICS:
+  BASIC:
+    LIST: "QGSP_BERT_EMV"

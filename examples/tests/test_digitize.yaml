@@ -1,0 +1,45 @@
+# ── Тест: DIGITIZE — сцинтилляционный детектор ──
+EVENTS: 10
+VISUALIZATION: false
+OUTPUT_FILE: "test_digitize.root"
+
+GEOMETRY:
+  WORLD:
+    shape: "box"
+    material: "G4_AIR"
+    DIMENSIONS: ["50*cm", "50*cm", "50*cm"]
+  OBJECTS:
+    scintillator:
+      name: "Scintillator"
+      shape: "box"
+      material: "G4_PLASTIC_SCINTILLATOR"
+      DIMENSIONS: ["5*cm", "5*cm", "5*cm"]
+      POSITION: [0, 0, 0]
+      isSensitive: true
+      DIGITIZE:
+        quantum_efficiency: 0.9
+        energy_res_fwhm: 0.12
+        energy_res_ref_energy_MeV: 0.662
+        time_res_fwhm_ns: "500*ps"
+        time_smear_model: "gaussian"
+        signal_model: "exponential"
+        signal_rise_ns: "2*ns"
+        signal_fall_ns: "40*ns"
+        dead_time_ns: "100*ns"
+        dead_time_model: "nonparalyzable"
+        pileup_model: "none"
+        threshold: "10*keV"
+        noise_level: "1*keV"
+        gain: 1000
+
+SOURCE:
+  gamma_source:
+    type: "particleGun"
+    particle: "gamma"
+    energy: "662*keV"
+    direction: { x: 0, y: 0, z: 1 }
+    pos: { x: 0, y: 0, z: "-20*cm" }
+
+PHYSICS:
+  BASIC:
+    LIST: "QGSP_BERT_EMV"

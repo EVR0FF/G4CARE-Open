@@ -1,0 +1,141 @@
+# ── Демо: ExprTK-выражения в источнике частиц ──
+# Демонстрирует возможности, недоступные в UI-командах Geant4:
+#   1. Энергия как функция от event_id (невозможно в макросах — только литерал)
+#   2. Сканирующий пучок: направление меняется от события к событию
+#   3. Случайный вес частицы (rand_gauss)
+#   4. Условный reject (отбрасываем частицы с низкой энергией)
+#   5. Пользовательские переменные, доступные во всех выражениях
+#
+# Ссылки на код:
+#   ParticleGunSource.cc:31-64 — PrecompiledExpr для energy, direction, pos, weight, reject_if
+#   ExpressionEvaluator.hh — зарегистрированные функции (rand_gauss, rand_poisson, ...)
+
+NTHREADS: 4
+OUTPUT_FILE: "demo_exprtk_source.root"
+EVENTS: 12
+VISUALIZATION: false
+ENABLE_DICTIONARY: false
+
+GEOMETRY:
+  WORLD:
+    shape: "box"
+    material: "G4_AIR"
+    DIMENSIONS: ["1*m", "1*m", "1*m"]
+
+  OBJECTS:
+    target:
+      name: "target"
+      shape: "box"
+      material: "G4_WATER"
+      DIMENSIONS: ["30*cm", "30*cm", "30*cm"]
+      POSITION: [0, 0, 0]
+      isSensitive: true
+
+SOURCE_MODE: "flow"
+
+SOURCE:
+  # ── Источник 1: энергия растёт с номером события ──
+  energy_scan:
+    type: "particleGun"
+    particle: "e-"
+    # Невозможно в макросе: /gun/energy 1.0 keV — только литерал
+    # ExprTK: энергия = 0.5 + event_id * 0.2 кэВ (от 0.5 до 10.3 кэВ за 50 событий)
+    energy: "$$ 50 + event_id * 10 $$ keV"
+    direction:
+      x: 0
+      y: 0
+      z: 1
+    pos:
+      x: 0
+      y: 0
+      z: 0
+
+  # ── Источник 2: сканирующий пучок (направление меняется синусоидально) ──
+  scanning_beam:
+    type: "particleGun"
+    particle: "e-"
+    # Невозможно в макросе: /gun/direction x y z — только фиксированные числа
+    # ExprTK: пучок описывает круг при смене event_id
+    energy: "100 keV"
+    direction:
+      x: "$$ sin(event_id * 0.12566) $$"    # sin(event_id * 2π/50) — полный круг за 50 событий
+      y: "$$ cos(event_id * 0.12566) $$"
+      z: 0
+    pos:
+      x: 0
+      y: 0
+      z: 0
+
+  # ── Источник 3: случайный вес + условный reject ──
+  weighted_reject:
+    type: "particleGun"
+    particle: "e-"
+    energy: "200 keV"
+    direction:
+      x: 0
+      y: 0
+      z: 1
+    pos:
+      x: 0
+      y: 0
+      z: 0
+    # Невозможно в макросе: weight только константа
+    # ExprTK: гауссово распределение веса вокруг 1.0 с сигмой 0.2
+    weight: "$$ rand_gauss(1.0, 0.2) $$"
+    # Невозможно в макросе: reject_if не предусмотрен в UI-командах
+    # ExprTK: отбрасываем каждое 3-е событие (event_id % 3 == 2)
+    # Доступные переменные в источнике: event_id, v_i, p_i + пользовательские
+    reject_if: "event_id % 3 == 2"
+
+  # ── Источник 4: пользовательские переменные ──
+  variable_demo:
+    type: "particleGun"
+    particle: "e-"
+    # Переменные, доступные во всех выражениях этого источника
+    variables:
+      my_threshold: 2.0
+      energy_scale: 0.3
+    energy: "$$ energy_scale * (event_id % 10 + 1) * 100 $$ keV"
+    direction:
+      x: 0
+      y: 0
+      z: 1
+    pos:
+      x: 0
+      y: 0
+      z: 0
+    # Отбрасываем события, где event_id превышает порог (умноженный на 10)
+    reject_if: "event_id > my_threshold * 10"
+
+PHYSICS:
+  BASIC:
+    LIST: "FTFP_BERT"
+
+NTUPLES: ["g4care", "primary"]
+NTUPLE:
+  primary:
+    columns:
+      - "event_id"
+      - "kinetic_energy"
+      - "dir_x"
+      - "dir_y"
+      - "dir_z"
+      - "weight"
+      - "particle_name"
+      - "x"
+      - "y"
+      - "z"
+  g4care:
+    columns:
+      - "event_id"
+      - "particle_name"
+      - "kinetic_energy"
+      - "x"
+      - "y"
+      - "z"
+      - "dir_x"
+      - "dir_y"
+      - "dir_z"
+      - "weight"
+      - "edep"
+      - "volume_name"

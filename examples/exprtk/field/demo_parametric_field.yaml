@@ -1,0 +1,92 @@
+# ── Демо: Параметрические E/B поля через ExprTK ──
+# Демонстрирует возможности, принципиально недоступные в UI-командах Geant4:
+#   UI-команды Geant4 для полей (/field/...) принимают только:
+#     - uniform поля (константный вектор)
+#     - pre-defined field maps из файлов
+#   НЕВОЗМОЖНО задать поле как математическую функцию координат.
+#
+# ExprTK позволяет описывать компоненты поля как произвольные
+# функции от (x, y, z, t) через e_equations / b_equations.
+#
+# Ссылки на код:
+#   FieldManager.cc:196-226 — CreateParametricField (e_equations, b_equations)
+#   ParametricField.cc — fEval.Precompile() для каждой компоненты
+#   ExpressionEvaluator.hh — Precompile(), Execute() с переменными x,y,z,t
+
+NTHREADS: 1
+OUTPUT_FILE: "demo_parametric_field.root"
+EVENTS: 2
+VISUALIZATION: false
+
+GEOMETRY:
+  WORLD:
+    shape: "box"
+    material: "G4_AIR"
+    DIMENSIONS: ["1*m", "1*m", "1*m"]
+
+  OBJECTS:
+    target:
+      name: "target"
+      shape: "box"
+      material: "G4_Galactic"
+      DIMENSIONS: ["20*cm", "20*cm", "40*cm"]
+      POSITION: [0, 0, 0]
+      isSensitive: true
+
+SOURCE_MODE: "flow"
+
+SOURCE:
+  e_beam:
+    type: "particleGun"
+    particle: "e-"
+    energy: "100 keV"
+    direction:
+      x: "$$ 0.1 $$"     # небольшой угол для проверки отклонения
+      y: 0
+      z: 1
+    pos:
+      x: 0
+      y: 0
+      z: "-15*cm"
+
+PHYSICS:
+  BASIC:
+    LIST: "FTFP_BERT"
+
+# ── Параметрические поля ──
+# Синтаксис: e_equations: [Ex_expr, Ey_expr, Ez_expr] (3 строки ExprTK)
+#            b_equations: [Bx_expr, By_expr, Bz_expr] (3 строки ExprTK)
+# Для глобального поля volume не указывается или volume: ""
+FIELDS:
+  # ── Пример 1: квадрупольное электрическое поле ──
+  # Ex ~ x, Ey ~ -y — фокусировка по x, дефокусировка по y
+  # Невозможно в /field/... макросах: нет функций координат
+  - name: "quadrupole_e"
+    type: "parametric"
+    e_equations:
+      - "$$ 100 * x * 1000 $$"     # x в mm → V/cm (1000 для заметного эффекта)
+      - "$$ -100 * y * 1000 $$"    # -y
+      - "0"                         # Ez = 0
+
+  # ── Пример 2: однородное магнитное поле 1 T по оси z ──
+  # Простое, но через ExprTK — для демонстрации синтаксиса
+  - name: "uniform_b_field"
+    type: "parametric"
+    b_equations:
+      - "0"
+      - "0"
+      - "1.0"
+
+NTUPLES: ["g4care"]
+NTUPLE:
+  g4care:
+    columns:
+      - "event_id"
+      - "x"
+      - "y"
+      - "z"
+      - "kinetic_energy"
+      - "dir_x"
+      - "dir_y"
+      - "dir_z"
+      - "particle_name"

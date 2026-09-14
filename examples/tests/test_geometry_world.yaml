@@ -1,0 +1,10 @@
+# ── Тест: GEOMETRY.WORLD — разные формы мира ──
+EVENTS: 1
+VISUALIZATION: false
+
+# Programmatic box world
+GEOMETRY:
+  WORLD:
+    shape: "box"
+    material: "G4_AIR"
+    DIMENSIONS: ["2*m", "2*m", "2*m"]

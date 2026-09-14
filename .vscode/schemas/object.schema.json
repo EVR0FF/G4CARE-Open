@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://g4care/schema/object",
+  "title": "OBJECT",
+  "description": "Detector objects (inline format).",
+  "type": "object",
+  "markdownDescription": "En: Detector object definitions. Each key is an object ID with full geometry specification.\nRu: Определения объектов детектора. Каждый ключ — ID объекта с полной спецификацией геометрии.\n\nSee: ObjectManager.cc.\n\nExample:\n```yaml\nOBJECT:\n  target:\n    name: Target\n    shape: box\n    material: G4_WATER\n    size: \"5*cm, 5*cm, 5*cm\"\n    pos: {x: 0, y: 0, z: 0}\n    isSensitive: true\n```",
+  "patternProperties": {
+    "^.*$": { "$ref": "definitions.schema.json#/$defs/objectDef" }
+  }
+}

@@ -1,0 +1,24 @@
+# ── Тест: MACROS — строки, объекты, stage, condition ──
+EVENTS: 10
+VISUALIZATION: true
+
+VIS_MACROS:
+  - "init_vis.mac"
+
+GEOMETRY:
+  WORLD:
+    shape: "box"
+    material: "G4_AIR"
+    DIMENSIONS: ["1*m", "1*m", "1*m"]
+
+MACROS:
+  - "export_geom.mac"
+  - file: "init_vis.mac"
+    stage: "before"
+  - file: "export_geom.mac"
+    stage: "after"
+    condition: "run_id > 0"
+
+PHYSICS:
+  BASIC:
+    LIST: "QGSP_BERT_EMV"

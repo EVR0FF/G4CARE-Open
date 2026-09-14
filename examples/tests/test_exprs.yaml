@@ -1,0 +1,98 @@
+# ── Тест: EXPRS — все функции (N_STEP, N_EVENT, N_TRACK, N_RUN, WHEN, wildcards) ──
+EVENTS: 10
+VISUALIZATION: false
+OUTPUT_FILE: "test_exprs.root"
+
+GEOMETRY:
+  WORLD:
+    shape: "box"
+    material: "G4_AIR"
+    DIMENSIONS: ["1*m", "1*m", "1*m"]
+  OBJECTS:
+    target:
+      name: "target"
+      shape: "box"
+      material: "G4_WATER"
+      DIMENSIONS: ["10*cm", "10*cm", "10*cm"]
+      POSITION: [0, 0, 0]
+      isSensitive: true
+    detector1:
+      name: "Detector1"
+      shape: "box"
+      material: "G4_WATER"
+      DIMENSIONS: ["5*cm", "5*cm", "5*cm"]
+      POSITION: [20*cm, 0, 0]
+      isSensitive: true
+    detector2:
+      name: "Detector2"
+      shape: "box"
+      material: "G4_WATER"
+      DIMENSIONS: ["5*cm", "5*cm", "5*cm"]
+      POSITION: [-20*cm, 0, 0]
+      isSensitive: true
+
+SOURCE:
+  e_gun:
+    type: "particleGun"
+    particle: "e-"
+    energy: "1*MeV"
+    direction: { x: 0, y: 0, z: 1 }
+    pos: { x: 0, y: 0, z: "-50*cm" }
+
+PHYSICS:
+  BASIC:
+    LIST: "QGSP_BERT_EMV"
+
+EXPRS:
+  # ── Тест 1: N_STEP (каждые 2 шага, только в target, WHEN=end) ──
+  - NAME: "step_every_2"
+    VOLUME: "target"
+    N_STEP: 2
+    WHEN: "end"
+    SCRIPT: |
+      g4cout('[EXPRS-TEST] STEP end | edep=', edep, ' MeV | particle=', particle_name);
+
+  # ── Тест 2: N_EVENT (каждое событие) ──
+  - NAME: "event_every_1"
+    VOLUME: "target"
+    N_EVENT: 1
+    SCRIPT: |
+      g4cout('[EXPRS-TEST] EVENT end | n_events=', n_events);
+
+  # ── Тест 3: N_TRACK (каждые 2 трека) ──
+  - NAME: "track_every_2"
+    VOLUME: "target"
+    N_TRACK: 2
+    SCRIPT: |
+      g4cout('[EXPRS-TEST] TRACK end | ke=', kinetic_energy, ' MeV | pid=', pdg_code);
+
+  # ── Тест 4: N_RUN (один раз в конце run) ──
+  - NAME: "run_summary"
+    VOLUME: "World"
+    N_RUN: 1
+    SCRIPT: |
+      g4cout('[EXPRS-TEST] RUN END - all events processed');
+
+  # ── Тест 5: VOLUME wildcard (все детекторы Detector*) ──
+  - NAME: "wildcard_detectors"
+    VOLUME: "Detector*"
+    N_STEP: 5
+    WHEN: "end"
+    SCRIPT: |
+      g4cout('[EXPRS-TEST] WILDCARD | volume_id=', volume_id, ' | edep=', edep, ' MeV');
+
+  # ── Тест 6: WHEN=start (перед шагом) ──
+  - NAME: "step_start"
+    VOLUME: "target"
+    N_STEP: 3
+    WHEN: "start"
+    SCRIPT: |
+      g4cout('[EXPRS-TEST] STEP start | ke=', kinetic_energy, ' MeV | particle=', particle_name);
+
+  # ── Тест 7: N=0 (каждый шаг)
+  - NAME: "every_step"
+    VOLUME: "target"
+    N_STEP: 1
+    WHEN: "end"
+    SCRIPT: |
+      g4cout('[EXPRS-TEST] EVERY_STEP | edep=', edep, ' MeV');

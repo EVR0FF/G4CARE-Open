@@ -1,0 +1,161 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://g4care/schema/chemistry",
+  "title": "CHEMISTRY",
+  "description": "Geant4-DNA chemistry stage configuration.",
+  "type": "object",
+  "markdownDescription": "En: Chemistry stage configuration for Geant4-DNA.\nRu: Настройки химического этапа Geant4-DNA.\n\nSee: ChemistryAction.cc, TimeStepAction.cc, PrimaryKiller.cc, main.cc.\n\nExample:\n```yaml\nCHEMISTRY:\n  ENABLE: true\n  TIME_STEP_MODEL: \"SBS\"\n  TEMPERATURE: \"300.0*kelvin\"\n  PRESSURE: \"1.0*atmosphere\"\n  START_TIME: \"1*ps\"\n  END_TIME: \"1*ns\"\n  SPECIES: [\"OH\", \"H\", \"e_aq\", \"H2O2\", \"H2\"]\n  REACTION:\n    OH_OH: \"5.5e9*L/(mol*s)\"\n```",
+  "properties": {
+    "ENABLE": {
+      "type": "boolean",
+      "default": false,
+      "markdownDescription": "En: Enable chemistry stage after particle tracking.\nRu: Включить химический этап после трекинга частиц.\nDefault: `false`."
+    },
+    "TIME_STEP_MODEL": {
+      "type": "string",
+      "enum": ["SBS", "IRT", "IRT_syn"],
+      "default": "SBS",
+      "markdownDescription": "En: Time step model. Passed to /process/chem/TimeStepModel.\n  `SBS` — Step-By-Step (default).\n  `IRT` — Independent Reaction Time.\n  `IRT_syn` — IRT with synchronization.\nRu: Модель временного шага. Передаётся в /process/chem/TimeStepModel.\n  `SBS` — пошаговая (по умолчанию).\n  `IRT` — независимое время реакции.\n  `IRT_syn` — IRT с синхронизацией.\nDefault: `SBS`."
+    },
+    "TEMPERATURE": {
+      "type": ["number", "string"],
+      "default": "300.0*kelvin",
+      "markdownDescription": "En: Temperature with units. Passed to /chem/diffusion/temperature.\nRu: Температура с единицами. Передаётся в /chem/diffusion/temperature.\nDefault: `300.0*kelvin`."
+    },
+    "PRESSURE": {
+      "type": ["number", "string"],
+      "default": "1.0*atmosphere",
+      "markdownDescription": "En: Pressure with units. Passed to /chem/diffusion/pressure.\nRu: Давление с единицами. Передаётся в /chem/diffusion/pressure.\nDefault: `1.0*atmosphere`."
+    },
+    "DENSITY": {
+      "type": ["number", "string"],
+      "default": "1.0*g/cm3",
+      "markdownDescription": "En: Density with units. Applied only if key present (HasKey). Passed to /chem/diffusion/density.\nRu: Плотность с единицами. Применяется только если ключ задан. Передаётся в /chem/diffusion/density.\nDefault: `1.0*g/cm3`."
+    },
+    "START_TIME": {
+      "type": ["number", "string"],
+      "default": "1*ps",
+      "markdownDescription": "En: Start time. Applied only if key present. Passed to /chem/time/start.\nRu: Начальное время. Применяется только если ключ задан. Передаётся в /chem/time/start.\nDefault: `1*ps`."
+    },
+    "END_TIME": {
+      "type": ["number", "string"],
+      "default": "1*ns",
+      "markdownDescription": "En: End time. Applied only if key present. Passed to /chem/time/end.\nRu: Конечное время. Применяется только если ключ задан. Передаётся в /chem/time/end.\nDefault: `1*ns`."
+    },
+    "MAX_TIME_STEP": {
+      "type": ["number", "string"],
+      "markdownDescription": "En: Maximum time step (TimeStepAction). 0 = Geant4-DNA default steps.\nRu: Максимальный шаг по времени (TimeStepAction). 0 = стандартные шаги Geant4-DNA."
+    },
+    "VOLUME": {
+      "oneOf": [
+        { "type": "string" },
+        { "type": "array", "items": { "type": "string" } }
+      ],
+      "markdownDescription": "En: Logical volume name or list for chemistry (SteppingAction).\nRu: Имя логического объёма или список для химии (SteppingAction)."
+    },
+    "SPECIES": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "markdownDescription": "En: Tracked chemical species. `\"All\"` = full set. Added via /chem/chemistry/addMolecule.\nRu: Список отслеживаемых видов. `\"All\"` = все виды. Добавляются через /chem/chemistry/addMolecule.\n\nExample: `['OH', 'H', 'e_aq', 'H2O2', 'H2']`."
+    },
+    "CHEM_LIST": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "markdownDescription": "En: Fallback species list. Used only if SPECIES is empty.\nRu: Резервный список видов. Используется только если SPECIES пуст."
+    },
+    "SPECIES_DEFINITIONS": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "markdownDescription": "En: Custom species definitions (D and radius). Passed to /chem/species.\nRu: Определения видов (D и радиус). Передаются в /chem/species.\n\nExample: `['OH 2.8e-9 0.22e-9', 'H 5.0e-9 0.19e-9']`."
+    },
+    "SOLVATION_MODEL": {
+      "type": "string",
+      "default": "",
+      "markdownDescription": "En: Solvation model for electrons. Passed to /process/dna/e-SolvationSubType.\nRu: Модель сольватации для электронов. Передаётся в /process/dna/e-SolvationSubType."
+    },
+    "SCHEDULER_VERBOSE": {
+      "type": "integer",
+      "default": 0,
+      "minimum": 0,
+      "markdownDescription": "En: Scheduler verbosity. 0 = off. Passed to /scheduler/verbose.\nRu: Детализация планировщика. 0 = выключено. Передаётся в /scheduler/verbose.\nDefault: `0`."
+    },
+    "RESET_REACTION_TABLE": {
+      "type": "boolean",
+      "default": false,
+      "markdownDescription": "En: Reset reaction table before custom rates. Calls /chem/reaction/UI.\nRu: Сбросить таблицу реакций перед пользовательскими скоростями. Вызывает /chem/reaction/UI.\nDefault: `false`."
+    },
+    "REACTION": {
+      "type": "object",
+      "description": "Reaction rate constants.",
+      "markdownDescription": "En: Reaction rate constants. Read via GetSectionKeys(\"CHEMISTRY.REACTION\"). Modified via /chem/reaction/modify.\nRu: Константы скоростей реакций. Читаются через GetSectionKeys(\"CHEMISTRY.REACTION\"). Изменяются через /chem/reaction/modify.\n\nExample:\n```yaml\nREACTION:\n  OH_OH: \"5.5e9*L/(mol*s)\"\n  H_OH: \"2.0e10*L/(mol*s)\"\n```",
+      "patternProperties": {
+        "^.*$": {
+          "type": ["number", "string"],
+          "markdownDescription": "En: Reaction rate with units.\nRu: Скорость реакции с единицами.\n\nExample: `\"5.5e9*L/(mol*s)\"`."
+        }
+      }
+    },
+    "G_VALUE": {
+      "type": "object",
+      "description": "G-Value scoring (TimeStepAction).",
+      "markdownDescription": "En: G-Value scoring config (TimeStepAction).\nRu: Настройка скоринга G-Value (TimeStepAction).\n\nExample:\n```yaml\nG_VALUE:\n  ENABLE: true\n  SPECIES: [\"OH\", \"H\", \"e_aq\"]\n  N_OF_TIME_BINS: 50\n```",
+      "properties": {
+        "ENABLE": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "En: Enable G-Value scoring.\nRu: Включить скоринг G-Value.\nDefault: `false`."
+        },
+        "SPECIES": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "markdownDescription": "En: Species for G-Value. Falls back to CHEMISTRY.SPECIES.\nRu: Виды для G-Value. Если пусто — из CHEMISTRY.SPECIES."
+        },
+        "N_OF_TIME_BINS": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "markdownDescription": "En: Number of log time bins. Generated between START_TIME and END_TIME.\nRu: Количество лог. временных интервалов. Генерируются между START_TIME и END_TIME.\nDefault: `0`."
+        },
+        "TIME_BINS": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "markdownDescription": "En: Manual time bin edges. Used if N_OF_TIME_BINS = 0.\nRu: Ручные границы временных интервалов. Если N_OF_TIME_BINS = 0."
+        }
+      }
+    },
+    "PRIMARY_KILLER": {
+      "type": "object",
+      "description": "Primary particle killer (PrimaryKiller.cc, ActionInitialization.cc).",
+      "markdownDescription": "En: Primary particle killer. Kills track at ELOSS_MIN or aborts event at ELOSS_MAX.\nRu: Обрыв первичной частицы при ELOSS_MIN или прерывание события при ELOSS_MAX.\n\nSee: PrimaryKiller.cc, ActionInitialization.cc.\n\nExample:\n```yaml\nPRIMARY_KILLER:\n  ENABLE: true\n  ELOSS_MIN: \"100*keV\"\n  ELOSS_MAX: \"1*MeV\"\n  SIZE: [10*um, 10*um, 10*um]\n```",
+      "properties": {
+        "ENABLE": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "En: Enable primary killer.\nRu: Включить обрыв первичной частицы.\nDefault: `false`."
+        },
+        "ELOSS_MIN": {
+          "type": ["number", "string"],
+          "default": 0.0,
+          "markdownDescription": "En: Min accumulated Edep to kill primary track. 0 = disabled.\nRu: Мин. накопленное энерговыделение для обрыва трека. 0 = отключено.\nDefault: `0.0`."
+        },
+        "ELOSS_MAX": {
+          "type": ["number", "string"],
+          "default": 0.0,
+          "markdownDescription": "En: Max Edep in single step. Exceeded → abort event. 0 = disabled.\nRu: Макс. энерговыделение за шаг. Превышение → прерывание события. 0 = отключено.\nDefault: `0.0`."
+        },
+        "SIZE": {
+          "type": "array",
+          "items": { "type": ["number", "string"] },
+          "minItems": 3,
+          "maxItems": 3,
+          "markdownDescription": "En: Virtual volume half-sizes [x, y, z]. All > 0 to enable.\nRu: Полу-размеры виртуального объёма [x, y, z]. Все > 0 для включения."
+        }
+      }
+    }
+  }
+}

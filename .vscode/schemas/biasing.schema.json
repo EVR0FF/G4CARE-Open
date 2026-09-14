@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://g4care/schema/biasing",
+  "title": "BIASING",
+  "description": "Weight Window biasing configuration.",
+  "type": "object",
+  "markdownDescription": "En: Weight Window biasing for faster simulation convergence.\nRu: Weight Window биасинг для ускорения сходимости моделирования.\n\nSee: WeightWindowManager.cc, PhysicsManager.cc.\n\nExample:\n```yaml\nBIASING:\n  weightWindow:\n    ENABLE: true\n    particles: [\"e-\", \"gamma\"]\n    mesh:\n      type: manual\n      manual:\n        bins: [10, 10, 10]\n        min: [\"-5*cm\", \"-5*cm\", \"-5*cm\"]\n        max: [\"5*cm\", \"5*cm\", \"5*cm\"]\n    algorithm:\n      upperLimitFactor: 5.0\n      survivalFactor: 3.0\n```",
+  "properties": {
+    "weightWindow": { "$ref": "definitions.schema.json#/$defs/weightWindowDef" }
+  }
+}

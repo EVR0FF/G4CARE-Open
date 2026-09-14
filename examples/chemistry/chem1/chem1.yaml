@@ -1,0 +1,75 @@
+# chem1: Geant4-DNA — доза, G-факторы, нейтральность через POST_RUN_SCRIPT
+NTHREADS: 1
+OUTPUT_FILE: "chem1.root"
+EVENTS: 1
+VISUALIZATION: false
+ENABLE_DICTIONARY: false
+RUNACTION_VERBOSE: 1
+
+GEOMETRY:
+  WORLD:
+    shape: "box"
+    material: "G4_AIR"
+    DIMENSIONS: ["15*um", "15*um", "15*um"]
+
+  OBJECTS:
+    target:
+      name: "target"
+      shape: "box"
+      material: "G4_WATER"
+      DIMENSIONS: ["5*um", "5*um", "5*um"]
+      POSITION: [0, 0, 0]
+      isSensitive: true
+      max_step_size: "0"
+
+SOURCE_MODE: "flow"
+SOURCE:
+  e_source:
+    type: "particleGun"
+    particle: "e-"
+    energy: "5.0*keV"
+    direction: { x: 0, y: 0, z: 1 }
+    pos: { x: 0, y: 0, z: 0 }
+
+PHYSICS:
+  BASIC:
+    LIST: ""
+  ADVANCED:
+    EM_DNA:
+      ENABLE: true
+    EM_DNA_CHEM:
+      ENABLE: true
+
+CHEMISTRY:
+  ENABLE: true
+  TIME_STEP_MODEL: "SBS"
+  END_TIME: "1*us"
+  SCHEDULER_VERBOSE: 0
+  VOLUME:
+    - "target"
+  SPECIES: ["All"]
+
+POST_RUN_SCRIPT: |
+  E_J := edep_eV * 1.602176634e-19;
+  dose_Gy := (waterMass_kg > 0) ? (E_J / waterMass_kg) : 0;
+  print("[YAML] EDep=", edep_eV, " eV mass=", waterMass_kg, " kg dose=", dose_Gy, " Gy");
+  print("[YAML] Chemistry @ t=", endTime_ns, " ns:");
+  Gc_eaq := (edep_eV > 0) ? (nCreated_e_aq * 100 / edep_eV) : 0;
+  Gt_eaq := (edep_eV > 0) ? (nAtT_e_aq * 100 / edep_eV) : 0;
+  print("  e_aq  Nc=", nCreated_e_aq, " Nt=", nAtT_e_aq, " Gc=", Gc_eaq, " Gt=", Gt_eaq);
+  Gc_OH := (edep_eV > 0) ? (nCreated_OH * 100 / edep_eV) : 0;
+  Gt_OH := (edep_eV > 0) ? (nAtT_OH * 100 / edep_eV) : 0;
+  print("  OH    Nc=", nCreated_OH, " Nt=", nAtT_OH, " Gc=", Gc_OH, " Gt=", Gt_OH);
+  Gc_H := (edep_eV > 0) ? (nCreated_H * 100 / edep_eV) : 0;
+  Gt_H := (edep_eV > 0) ? (nAtT_H * 100 / edep_eV) : 0;
+  print("  H     Nc=", nCreated_H, " Nt=", nAtT_H, " Gc=", Gc_H, " Gt=", Gt_H);
+  totalCharge := (nAtT_e_aq * -1) + (nAtT_H3Op * 1) + (nAtT_OHm * -1);
+  if (abs(totalCharge) < 0.001) { print("[YAML] TOTAL charge ", totalCharge, " (NEUTRAL)"); }
+  else { print("[YAML] TOTAL charge ", totalCharge, " (VIOLATION!)"); }
+
+NTUPLES: ["g4care"]
+NTUPLE:
+  g4care:
+    columns:
+      - "particle_name"
+      - "edep"

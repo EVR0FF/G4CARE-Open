@@ -1,0 +1,110 @@
+# ── chem5: G-value (опциональные физика/химия) + ASCII-вывод ──
+# Аналог examples/chem5/beam.in
+# Электрон ~1 кэВ, 10 событий, eLossMin=1 keV, eLossMax=2 keV
+# G4EmDNAPhysics_option8 + G4EmDNAChemistry_option1 (через chem8)
+
+NTHREADS: 8
+OUTPUT_FILE: "chem5.root"
+EVENTS: 10
+VISUALIZATION: false
+ENABLE_DICTIONARY: false
+RUNACTION_VERBOSE: 1
+
+GEOMETRY:
+  WORLD:
+    shape: "box"
+    material: "G4_AIR"
+    DIMENSIONS: ["1*m", "1*m", "1*m"]
+
+  OBJECTS:
+    target:
+      name: "target"
+      shape: "box"
+      material: "G4_WATER"
+      DIMENSIONS: ["50*cm", "50*cm", "50*cm"]
+      POSITION: [0, 0, 0]
+      isSensitive: true
+      max_step_size: "0"
+
+SOURCE_MODE: "flow"
+
+SOURCE:
+  e_source:
+    type: "particleGun"
+    particle: "e-"
+    energy: "1.0*keV"
+    direction:
+      x: 0
+      y: 0
+      z: 1
+    pos:
+      x: 0
+      y: 0
+      z: 0
+
+PHYSICS:
+  BASIC:
+    LIST: "FTFP_BERT"
+  ADVANCED:
+    EM_DNA:
+      ENABLE: true
+    EM_DNA_CHEM8:
+      ENABLE: true
+
+# ── Химия: опциональные конструкторы через EM_DNA_CHEM8 ──
+CHEMISTRY:
+  ENABLE: true
+  TIME_STEP_MODEL: "SBS"
+  START_TIME: "1*ps"
+  END_TIME: "1*ns"
+  VOLUME:
+    -"target"
+
+  # Виды по умолчанию (без кастомных D/Radius — как в chem5)
+  SPECIES:
+    - "OH"
+    - "H"
+    - "e_aq"
+    - "H3O"
+    - "H2O2"
+    - "H2"
+    - "HO2"
+    - "O2"
+
+  # PrimaryKiller
+  PRIMARY_KILLER:
+    ENABLE: true
+    ELOSS_MIN: "1*keV"
+    ELOSS_MAX: "2*keV"
+
+  # G-value скоррер (ASCII + ROOT)
+  G_VALUE:
+    ENABLE: true
+    N_OF_TIME_BINS: 50
+    SPECIES:
+      - "OH"
+      - "e_aq"
+      - "H"
+      - "H3O"
+      - "H2O2"
+      - "H2"
+      - "HO2"
+      - "O2"
+
+NTUPLES: ["g4care", "gfactor"]
+NTUPLE:
+  g4care:
+    columns:
+      - "particle_name"
+      - "kinetic_energy"
+      - "edep"
+      - "volume_name"
+      - "process_name"
+  gfactor:
+    columns:
+      - "time_ps"
+      - "species"
+      - "G_value"
+      - "G_value_err"
+      - "mean_edep_eV"
+      - "events"

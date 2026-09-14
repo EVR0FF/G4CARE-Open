@@ -1,0 +1,83 @@
+# ── chem4: G-value + PrimaryKiller ── e⁻ 100 keV, базовый G4EmDNAPhysics + G4EmDNAChemistry
+NTHREADS: 8
+OUTPUT_FILE: "chem4.root"
+EVENTS: 1
+VISUALIZATION: false
+ENABLE_DICTIONARY: false
+RUNACTION_VERBOSE: 1
+
+GEOMETRY:
+  WORLD:
+    shape: "box"
+    material: "G4_AIR"
+    DIMENSIONS: ["1*m", "1*m", "1*m"]
+
+  OBJECTS:
+    target:
+      name: "target"
+      shape: "box"
+      material: "G4_WATER"
+      DIMENSIONS: ["50*cm", "50*cm", "50*cm"]
+      POSITION: [0, 0, 0]
+      isSensitive: true
+      max_step_size: "0"
+
+SOURCE_MODE: "flow"
+SOURCE:
+  e_source:
+    type: "particleGun"
+    particle: "e-"
+    energy: "100.0*keV"
+    direction: { x: 0, y: 0, z: 1 }
+    pos: { x: 0, y: 0, z: 0 }
+
+PHYSICS:
+  BASIC:
+    LIST: ""
+  ADVANCED:
+    EM_DNA:
+      ENABLE: true
+    EM_DNA_CHEM:
+      ENABLE: true
+
+CHEMISTRY:
+  ENABLE: true
+  TIME_STEP_MODEL: "SBS"
+  START_TIME: "1*ps"
+  END_TIME: "1*ns"
+  SOLVATION_MODEL: "Ritchie1994"
+  SPECIES: ["O2", "H3O", "OH", "e_aq", "OHm", "H", "H2"]
+  SPECIES_DEFINITIONS:
+    - "O2 [ O2 | 0 | 2.4e-9 | 0.17 ]"
+    - "H3Op [ H3O | 1 | 9e-9 | 0.25 ]"
+    - "·OH [ ·OH | 0 | 2.8e-9 | 0.22 ]"
+    - "e_aq [ e_aq | -1 | 4.9e-9 | 0.5 ]"
+    - "OHm [ OH | -1 | 5.0e-9 | 0.33 ]"
+    - "H [ H | 0 | 7e-9 | 0.19 ]"
+    - "H2 [ H2 | 0 | 5e-9 | 0.14 ]"
+  RESET_REACTION_TABLE: true
+  REACTION:
+    "H + H -> H2": "1.2e10"
+    "e_aq + H -> H2 + OHm": "2.65e10"
+    "e_aq + e_aq -> H2 + OHm + OHm": "0.5e10"
+    "H3Op + OHm -> H2O": "1.43e11"
+    "e_aq + ·OH -> OHm": "2.95e10"
+    "·OH + ·OH -> H2O2": "0.44e10"
+    "e_aq + H2O2 -> OHm + ·OH": "1.41e10"
+    "e_aq + H3Op -> H + H2O": "2.11e10"
+    "·OH + H -> H2O": "1.44e10"
+  PRIMARY_KILLER:
+    ENABLE: true
+    ELOSS_MIN: "1*keV"
+    ELOSS_MAX: "2*keV"
+  G_VALUE:
+    ENABLE: true
+    N_OF_TIME_BINS: 50
+    SPECIES: ["·OH", "e_aq", "H", "H3Op", "H2O2", "H2", "OHm", "O2"]
+  VOLUME:
+    -"target"
+
+NTUPLES: ["g4care"]
+NTUPLE:
+  g4care:
+    columns: ["particle_name", "kinetic_energy", "edep", "volume_name", "process_name"]

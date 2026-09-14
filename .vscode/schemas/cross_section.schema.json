@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://g4care/schema/cross_section",
+  "title": "CROSS_SECTION",
+  "description": "Cross-section settings (BEB data) [WIP].",
+  "type": "object",
+  "markdownDescription": "En: Cross-section configuration. Currently supports BEB (Binary Encounter Bethe) data file for ionization.\nRu: Настройки сечений взаимодействия. Поддерживает BEB-файл данных для ионизации.\n\nSee: main.cc (HasKey CROSS_SECTION.BEB_FILE).",
+  "properties": {
+    "BEB_FILE": {
+      "type": "string",
+      "default": "",
+      "markdownDescription": "En: Path to BEB (Binary Encounter Bethe) data file for electron ionization.\nRu: Путь к файлу данных BEB для ионизации электронов.\n\nExample: `data/beb_water.csv`."
+    }
+  }
+}

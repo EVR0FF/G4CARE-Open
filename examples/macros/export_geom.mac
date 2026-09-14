@@ -1,0 +1,8 @@
+/vis/open VRML2FILE
+/vis/drawVolume
+/vis/viewer/flush
+/vis/viewer/set/targetPoint 0 0 0 cm
+/vis/viewer/zoom 3
+/vis/viewer/set/viewpointThetaPhi 45 45
+/vis/viewer/flush
+/vis/viewer/update

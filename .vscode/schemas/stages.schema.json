@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://g4care/schema/stages",
+  "title": "STAGES",
+  "description": "Multi-stage simulation configuration.",
+  "type": "object",
+  "markdownDescription": "En: Multi-stage simulation stages. Each key is a stage name, value overrides root-level parameters.\nRu: Этапы многостадийного моделирования. Каждый ключ — имя этапа, значение переопределяет параметры корневого уровня.\n\nSee: StageManager.cc.\n\nExample:\n```yaml\nSTAGES:\n  irradiation:\n    EVENTS: 1000000\n    SOURCE_MODE: flow\n    PHYSICS_MACRO: phys_irrad.mac\n  chemistry:\n    EVENTS: 1\n    CHEMISTRY:\n      ENABLE: true\n```",
+  "patternProperties": {
+    "^.*$": {
+      "type": "object",
+      "properties": {
+        "EVENTS": { "type": "integer", "default": 100, "minimum": 1, "markdownDescription": "En: Events in this stage.\nRu: Событий в этапе.\nDefault: `100`." },
+        "GEOMETRY_FILE": { "type": "string", "default": "", "markdownDescription": "En: GDML geometry file for this stage.\nRu: GDML-файл геометрии для этапа." },
+        "PHYSICS_MACRO": { "type": "string", "default": "", "markdownDescription": "En: Physics macro executed before stage.\nRu: Макрос физики перед этапом." },
+        "CHEMISTRY_MACRO": { "type": "string", "default": "", "markdownDescription": "En: Chemistry macro executed before stage.\nRu: Макрос химии перед этапом." },
+        "SAVE_CHEM_STATE": { "type": "boolean", "default": false, "markdownDescription": "En: Save chemistry state after stage.\nRu: Сохранить состояние химии после этапа.\nDefault: `false`." },
+        "LOAD_CHEM_STATE": { "type": "boolean", "default": false, "markdownDescription": "En: Load chemistry state before stage.\nRu: Загрузить состояние химии перед этапом.\nDefault: `false`." },
+        "SOURCE_MODE": { "type": "string", "enum": ["flow", "event"], "markdownDescription": "En: Source mode for this stage.\nRu: Режим источника для этапа." },
+        "CHEMISTRY": {
+          "type": "object",
+          "markdownDescription": "En: Chemistry overrides for this stage.\nRu: Переопределения химии для этапа.",
+          "properties": {
+            "ENABLE": { "type": "boolean", "default": false },
+            "LOAD_CHEM_STATE": { "type": "boolean", "default": false },
+            "SAVE_CHEM_STATE": { "type": "boolean", "default": false }
+          }
+        }
+      }
+    }
+  }
+}

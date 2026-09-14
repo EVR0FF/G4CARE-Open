@@ -1,0 +1,82 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://g4care/schema/exprs",
+  "title": "EXPRS",
+  "description": "Expression block (formerly SCORING). Contains ExprTk scripts executed at different simulation stages.\nБлок выражений (бывший SCORING). Содержит скрипты ExprTk, выполняемые на разных этапах симуляции.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["SCRIPT", "VOLUME"],
+    "properties": {
+      "NAME": {
+        "type": "string",
+        "description": "Block name (for logging).\nИмя блока (для логов).",
+        "markdownDescription": "En: Block name for logging.\nRu: Имя блока (для логов)."
+      },
+      "VOLUME": {
+        "oneOf": [
+          { "type": "string", "description": "Single logical volume name.\nИмя логического объёма (одно)." },
+          { "type": "array", "items": { "type": "string" }, "description": "List of logical volume names.\nСписок имён логических объёмов." }
+        ],
+        "markdownDescription": "En: Physical volume name (or list) where this script operates.\nRu: Имя физического объёма (или список имён), в котором работает данный скрипт.\n\nExamples / Примеры:\n- `VOLUME: \"target\"`\n- `VOLUME: [\"water1\", \"water2\", \"water3\"]`"
+      },
+      "VOLUME_PATTERN": {
+        "type": "string",
+        "description": "Glob pattern for selecting logical volumes.\nGlob-паттерн для выбора логических объёмов.",
+        "markdownDescription": "En: Wildcard pattern for selecting volumes by name.\nRu: Паттерн (wildcard) для выбора объёмов по имени.\n\nExamples / Примеры:\n- `VOLUME_PATTERN: \"detector_*\"`\n- `VOLUME_PATTERN: \"*\"` (all volumes / все объёмы)"
+      },
+      "EXCLUDE": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "List of volume names excluded from this block.\nСписок имён объёмов, исключаемых из блока.",
+        "markdownDescription": "En: Volume names to skip (even if they match VOLUME or VOLUME_PATTERN).\nRu: Имена объёмов, которые нужно пропустить (даже если они подходят под VOLUME или VOLUME_PATTERN).\n\nExample / Пример: `EXCLUDE: [\"background\", \"support\"]`"
+      },
+      "N_STEP": {
+        "type": "integer",
+        "default": 0,
+        "minimum": 0,
+        "description": "Step execution frequency.\nЧастота выполнения на шагах.",
+        "markdownDescription": "En: Execute SCRIPT every N steps.\nRu: Выполнять SCRIPT каждые N шагов.\n\n- `0` — disabled (both)\n- `1` — every step\n- `100` — every 100th step\n\nDefault / По умолчанию: `0`"
+      },
+      "N_EVENT": {
+        "type": "integer",
+        "default": 0,
+        "minimum": 0,
+        "description": "Event execution frequency.\nЧастота выполнения на событиях.",
+        "markdownDescription": "En: Execute SCRIPT every N events.\nRu: Выполнять SCRIPT каждые N событий.\n\n- `0` — disabled (both)\n- `1` — every event\n- `10` — every 10th event\n\nDefault / По умолчанию: `0`"
+      },
+      "N_TRACK": {
+        "type": "integer",
+        "default": 0,
+        "minimum": 0,
+        "description": "Track execution frequency.\nЧастота выполнения на треках.",
+        "markdownDescription": "En: Execute SCRIPT every N tracks.\nRu: Выполнять SCRIPT каждые N треков.\n\n- `0` — disabled (both)\n- `1` — every track\n- `1000` — every 1000th track\n\nDefault / По умолчанию: `0`"
+      },
+      "N_RUN": {
+        "type": "integer",
+        "default": 0,
+        "minimum": 0,
+        "description": "Run-end execution count.\nКоличество выполнений в конце run.",
+        "markdownDescription": "En: Execute SCRIPT at end of run.\nRu: Выполнить SCRIPT в конце run.\n\n- `0` — disabled (both)\n- `1` — execute once\n\nDefault / По умолчанию: `0`"
+      },
+      "WHEN": {
+        "type": "string",
+        "enum": ["start", "end"],
+        "default": "end",
+        "markdownDescription": "En: Execution timing.\nRu: Момент выполнения.\n\n- `start` — before step/event/track\n- `end` — after step/event/track (default)\n\nDefault / По умолчанию: `end`"
+      },
+      "PCOMP": {
+        "type": "array",
+        "items": { "type": "string" },
+        "default": [],
+        "description": "List of precompiled expression variables (for GEOMETRY/SOURCE).\nСписок предкомпилируемых выражений (для GEOMETRY/SOURCE).",
+        "markdownDescription": "En: Variable names whose values are precompiled before simulation start and available in GEOMETRY/SOURCE.\nRu: Имена переменных, значения которых будут предкомпилированы до старта симуляции и доступны в GEOMETRY/SOURCE.\n\nExample / Пример: `PCOMP: [\"target_radius\", \"beam_energy\"]`"
+      },
+      "SCRIPT": {
+        "type": "string",
+        "description": "ExprTk script body.\nExprTk-скрипт.",
+        "markdownDescription": "En: ExprTk script. Supports all ExprTk constructs: variables (`var x := 5;`), functions (`calc :=(a,b) a+b;`), loops (`for`, `while`), conditionals (`if`/`else`), output (`g4cout('text', var)`).\n\nAvailable variables:\n- ~93 FilterVars (edep, kinetic_energy, position_x, ...)\n- 15 basic (volume_mass, n_events, ...)\n- Chem vectors (Nc[i], Nt[i], Gc[i], Gt[i], charge[i], species_name(i))\n- All G4 units (joule, gray, MeV, mm, ...)\n\nRu: Скрипт на языке ExprTk. Поддерживает все конструкции ExprTk: переменные (`var x := 5;`), функции (`calc :=(a,b) a+b;`), циклы (`for`, `while`), условия (`if`/`else`), вывод (`g4cout('text', var)`).\n\nДоступные переменные:\n- ~93 FilterVars (edep, kinetic_energy, position_x, ...)\n- 15 базовых (volume_mass, n_events, ...)\n- Chem-векторы (Nc[i], Nt[i], Gc[i], Gt[i], charge[i], species_name(i))\n- Все G4-юниты (joule, gray, MeV, mm, ...)\n\nExample / Пример:\n```yaml\nSCRIPT: |\n  var dose := edep / (volume_mass * joule);\n  g4cout('Dose = ', dose, ' Gy');\n  for (var i := 0; i < chem_n_species; i += 1) {\n    g4cout(species_name(i), ': ', Nt[i]);\n  }\n```"
+      }
+    }
+  }
+}

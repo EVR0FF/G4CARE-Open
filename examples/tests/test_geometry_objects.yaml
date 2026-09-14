@@ -1,0 +1,39 @@
+# ── Тест: GEOMETRY.OBJECTS — все формы, вложенность ──
+EVENTS: 1
+VISUALIZATION: false
+
+GEOMETRY:
+  WORLD:
+    shape: "box"
+    material: "G4_AIR"
+    DIMENSIONS: ["2*m", "2*m", "2*m"]
+  OBJECTS:
+    box_obj:
+      name: "Box"
+      shape: "box"
+      material: "G4_WATER"
+      DIMENSIONS: ["10*cm", "10*cm", "10*cm"]
+      POSITION: [0, 0, 0]
+      isSensitive: true
+
+    sphere_obj:
+      name: "Sphere"
+      shape: "sphere"
+      material: "G4_AIR"
+      DIMENSIONS: ["0*cm", "5*cm"]
+      POSITION: [20*cm, 0, 0]
+
+    tube_obj:
+      name: "Tube"
+      shape: "tube"
+      material: "G4_Al"
+      DIMENSIONS: ["2*cm", "5*cm", "15*cm"]
+      POSITION: [-20*cm, 0, 0]
+
+    child:
+      name: "Child"
+      shape: "box"
+      material: "G4_Cu"
+      DIMENSIONS: ["1*cm", "1*cm", "1*cm"]
+      POSITION: [0, 0, 0]
+      mother: "Box"

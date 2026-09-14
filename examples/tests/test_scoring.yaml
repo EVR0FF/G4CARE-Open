@@ -1,0 +1,38 @@
+# ── Тест: SCORING — адаптивная скоринг-сетка ──
+EVENTS: 100
+VISUALIZATION: false
+
+GEOMETRY:
+  WORLD:
+    shape: "box"
+    material: "G4_AIR"
+    DIMENSIONS: ["20*cm", "20*cm", "20*cm"]
+  OBJECTS:
+    target:
+      name: "target"
+      shape: "box"
+      material: "G4_WATER"
+      DIMENSIONS: ["5*cm", "5*cm", "5*cm"]
+      POSITION: [0, 0, 0]
+      isSensitive: true
+
+SOURCE:
+  e_gun:
+    type: "particleGun"
+    particle: "e-"
+    energy: "1*MeV"
+    direction: { x: 0, y: 0, z: 1 }
+    pos: { x: 0, y: 0, z: "-10*cm" }
+
+SCORING:
+  TARGET_VOLUME_NAME: "target_LV"
+  HALF_SIZE_X: "5*cm"
+  HALF_SIZE_Y: "5*cm"
+  HALF_SIZE_Z: "5*cm"
+  MAX_DEPTH: 6
+  MIN_EVENTS_PER_CELL: 10
+  GRADIENT_THRESHOLD: 0.15
+
+PHYSICS:
+  BASIC:
+    LIST: "QGSP_BERT_EMV"

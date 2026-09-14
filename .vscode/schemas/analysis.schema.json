@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://g4care/schema/analysis",
+  "title": "ANALYSIS",
+  "description": "Analysis and NTuple configuration.",
+  "type": "object",
+  "markdownDescription": "En: Analysis configuration — tracked properties and NTuple tree definitions.\nRu: Настройки анализа — отслеживаемые свойства и определения NTuple-деревьев.\n\nSee: StageManager.cc.\n\nExample:\n```yaml\nANALYSIS:\n  TRACKED_PROPERTIES: [\"position\", \"material_name\", \"density\"]\n  NTUPLES:\n    step:\n      columns: [eventID, trackID, edep]\n```",
+  "properties": {
+    "TRACKED_PROPERTIES": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["position", "direction", "energy", "time", "mass", "charge", "trackID", "parentID", "stepLength", "energyDeposit", "processName", "volumeName", "speciesName", "GValue"]
+      },
+      "default": [],
+      "markdownDescription": "En: Properties tracked for each step/track in history NTuple.\nRu: Свойства, отслеживаемые для каждого шага/трека в истории.\n\nSee: StageManager::LoadConfiguration()."
+    },
+    "NTUPLES": {
+      "type": "object",
+      "description": "NTuple tree definitions.",
+      "markdownDescription": "En: NTuple tree definitions with columns and optional ExprTK filter.\nRu: Определения NTuple-деревьев с колонками и опциональным фильтром ExprTK.\n\nExample:\n```yaml\nNTUPLES:\n  step:\n    columns: [eventID, trackID, edep]\n    filter: \"edep > 0\"\n```",
+      "patternProperties": {
+        "^.*$": {
+          "type": "object",
+          "properties": {
+            "columns": {
+              "type": "array",
+              "items": { "type": "string" },
+              "markdownDescription": "En: Column names.\nRu: Имена колонок."
+            },
+            "filter": {
+              "type": "string",
+              "default": "",
+              "markdownDescription": "En: ExprTK filter expression.\nRu: Выражение-фильтр ExprTK.\n\nExample: `edep > 0 && volume == \"Target\"`."
+            }
+          },
+          "patternProperties": {
+            "^.*$": { "type": "string", "markdownDescription": "En: ExprTK expression for column value.\nRu: Выражение ExprTK для значения колонки." }
+          }
+        }
+      }
+    }
+  }
+}

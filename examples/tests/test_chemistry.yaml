@@ -1,0 +1,55 @@
+# ── Тест: CHEMISTRY — SBS, реакции, G-Value ──
+EVENTS: 1
+VISUALIZATION: false
+
+GEOMETRY:
+  WORLD:
+    shape: "box"
+    material: "G4_AIR"
+    DIMENSIONS: ["15*um", "15*um", "15*um"]
+  OBJECTS:
+    target:
+      name: "target"
+      shape: "box"
+      material: "G4_WATER"
+      DIMENSIONS: ["5*um", "5*um", "5*um"]
+      POSITION: [0, 0, 0]
+      isSensitive: true
+
+SOURCE:
+  e_source:
+    type: "particleGun"
+    particle: "e-"
+    energy: "5.0*keV"
+    direction: { x: 0, y: 0, z: 1 }
+    pos: { x: 0, y: 0, z: 0 }
+
+PHYSICS:
+  BASIC:
+    LIST: ""
+  ADVANCED:
+    EM_DNA:
+      ENABLE: true
+    EM_DNA_CHEM:
+      ENABLE: true
+
+CHEMISTRY:
+  ENABLE: true
+  TIME_STEP_MODEL: "SBS"
+  START_TIME: "1*ps"
+  END_TIME: "1*ns"
+  TEMPERATURE: "300.0*kelvin"
+  PRESSURE: "1.0*atmosphere"
+  SPECIES:
+    - "OH"
+    - "H"
+    - "e_aq"
+    - "H2O2"
+  VOLUME:
+    - "target"
+  REACTION:
+    OH_OH: "5.5e9*L/(mol*s)"
+  G_VALUE:
+    ENABLE: true
+    SPECIES: ["OH", "H", "e_aq"]
+    N_OF_TIME_BINS: 50

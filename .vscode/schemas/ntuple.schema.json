@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://g4care/schema/ntuple",
+  "title": "NTUPLE",
+  "description": "NTuple tree definitions.",
+  "type": "object",
+  "markdownDescription": "En: NTuple tree definitions with columns and optional ExprTK filter.\nRu: Определения NTuple-деревьев с колонками и опциональным фильтром ExprTK.\n\nExample:\n```yaml\nNTUPLE:\n  g4care:\n    columns: [\"event_id\", \"x\", \"y\", \"z\", \"edep\", \"kinetic_energy\"]\n    filter: \"edep > 0.01\"\n```",
+  "patternProperties": {
+    "^.*$": {
+      "type": "object",
+      "properties": {
+        "columns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "markdownDescription": "En: Column names for the NTuple.\nRu: Имена колонок NTuple."
+        },
+        "filter": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "En: ExprTK filter expression for row selection.\nRu: Выражение-фильтр ExprTK для отбора записей.\n\nExample: `edep > 0 && volume == \"Target\"`."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://g4care/schema/physics",
+  "title": "PHYSICS",
+  "description": "Physics configuration / Настройки физики",
+  "type": "object",
+  "markdownDescription": "En: Physics settings — physics list, production cuts, and advanced modules.\nRu: Настройки физики — физический лист, пороги рождения и продвинутые модули.\n\nExample / Пример:\n```yaml\nPHYSICS:\n  BASIC:\n    LIST: \"QGSP_BERT_EMV\"\n  CUTS:\n    default: \"0.1*mm\"\n    gamma: \"0.01*mm\"\n    e-: \"0.01*mm\"\n  ADVANCED:\n    STEPLIMITER:\n      ENABLE: true\n    EM_DNA:\n      ENABLE: true\n```",
+  "properties": {
+    "BASIC": {
+      "type": "object",
+      "description": "Basic physics settings / Базовые настройки физики",
+      "markdownDescription": "En: Basic physics — physics list selection.\nRu: Базовая физика — выбор физического листа.",
+      "properties": {
+        "LIST": {
+          "type": "string",
+          "enum": [
+            "",
+            "none",
+            "DNA",
+            "QGSP_BERT_EMV", "QGSP_BERT_EMX", "QGSP_BERT_EMY",
+            "FTFP_BERT_EMV", "FTFP_BERT_EMX", "FTFP_BERT_HP",
+            "QGSP_BIC_HP", "Shielding", "Shielding_EMV",
+            "QGSP_BERT", "FTFP_BERT", "QBBC", "QGSP_INCLXX",
+            "FTFP_INCLXX", "QGSP_BIC", "QGSP_BERT_HP",
+            "NuBeam", "QGSP_BERT_CHIPS"
+          ],
+          "default": "QGSP_BERT_EMV",
+          "markdownDescription": "En: Physics List name from `G4PhysListFactory`.\n  `\"\"` or `\"none\"` = no hadronic base (use ADVANCED only, e.g. EM_DNA for DNA-only mode).\n  `\"DNA\"` = DNA-only mode (empty physics list).\n  Other values: standard Geant4 physics lists.\nRu: Имя Physics List из `G4PhysListFactory`.\n  `\"\"` или `\"none\"` = без адронной базы (только ADVANCED, напр. EM_DNA для DNA-only).\n  `\"DNA\"` = режим только DNA (пустой физический лист).\n  Остальные значения: стандартные физические листы Geant4.\nDefault: `QGSP_BERT_EMV`."
+        },
+        "MACRO": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "En: Physics List macro path.\nRu: Путь к макросу Physics List.\n\nDefault / По умолчанию: `\"\"` (empty / пусто)"
+        }
+      }
+    },
+    "CUTS": {
+      "type": "object",
+      "description": "Production cuts / Пороги рождения вторичных частиц",
+      "markdownDescription": "En: Production cuts by particle type. Special key `default` = cut for all.\nRu: Пороги рождения (production cuts) по типам частиц. Спец. ключ `default` = для всех.\n\nExample / Пример:\n```yaml\nCUTS:\n  default: \"0.1*mm\"\n  gamma: \"0.01*mm\"\n  e-: \"0.01*mm\"\n  e+: \"0.01*mm\"\n  proton: \"0.1*mm\"\n```",
+      "patternProperties": {
+        "^.*$": {
+          "type": ["number", "string"],
+          "markdownDescription": "En: Cut value with length units.\nRu: Значение порога с единицами длины.\n\nExample / Пример: `\"0.1*mm\"`, `\"1*um\"`"
+        }
+      }
+    },
+    "ADVANCED": {
+      "type": "object",
+      "description": "Advanced physics modules / Продвинутые физические модули",
+      "markdownDescription": "En: Advanced physics modules with ENABLE/MACRO/LIBRARY/CONSTRUCTOR.\nRu: Продвинутые физические модули с параметрами ENABLE/MACRO/LIBRARY/CONSTRUCTOR.\n\nBuilt-in modules / Встроенные модули:\n- `STEPLIMITER` — step limiter / ограничитель шага\n- `RDECAY` — radioactive decay / радиоактивный распад\n- `OPTICS` — optical processes / оптические процессы\n- `EM_OPTION0`..`EM_OPTION4` — EM physics variants\n- `EM_LIVERMORE` — Livermore EM models\n- `EM_PENELOPE` — Penelope EM models\n- `EM_DNA` — Geant4-DNA EM\n- `EM_DNA_CHEM` — Geant4-DNA + chemistry\n- `EM_DNA_CHEM8` — Geant4-DNA option8 + chemistry\n- `ION` — ion physics / ионная физика\n- `DECAY` — decay physics / физика распадов\n- `HADRON_ELASTIC` — hadron elastic / адронное упругое\n- `WEIGHT_WINDOW` — Weight Windows (biasing / биасинг)",
+      "properties": {
+        "STEPLIMITER": { "$ref": "definitions.schema.json#/$defs/physicsModule" },
+        "RDECAY": { "$ref": "definitions.schema.json#/$defs/physicsModule" },
+        "OPTICS": { "$ref": "definitions.schema.json#/$defs/physicsModule" },
+        "EM_OPTION0": { "$ref": "definitions.schema.json#/$defs/physicsModule" },
+        "EM_OPTION1": { "$ref": "definitions.schema.json#/$defs/physicsModule" },
+        "EM_OPTION2": { "$ref": "definitions.schema.json#/$defs/physicsModule" },
+        "EM_OPTION3": { "$ref": "definitions.schema.json#/$defs/physicsModule" },
+        "EM_OPTION4": { "$ref": "definitions.schema.json#/$defs/physicsModule" },
+        "EM_LIVERMORE": { "$ref": "definitions.schema.json#/$defs/physicsModule" },
+        "EM_PENELOPE": { "$ref": "definitions.schema.json#/$defs/physicsModule" },
+        "EM_DNA": { "$ref": "definitions.schema.json#/$defs/physicsModule" },
+        "EM_DNA_CHEM": { "$ref": "definitions.schema.json#/$defs/physicsModule" },
+        "EM_DNA_CHEM8": { "$ref": "definitions.schema.json#/$defs/physicsModule" },
+        "ION": { "$ref": "definitions.schema.json#/$defs/physicsModule" },
+        "DECAY": { "$ref": "definitions.schema.json#/$defs/physicsModule" },
+        "HADRON_ELASTIC": { "$ref": "definitions.schema.json#/$defs/physicsModule" },
+        "WEIGHT_WINDOW": { "$ref": "definitions.schema.json#/$defs/weightWindowDef" }
+      },
+      "patternProperties": {
+        "^.*$": {
+          "type": "object",
+          "properties": {
+            "ENABLE": {
+              "type": "boolean",
+              "default": false,
+              "markdownDescription": "En: Enable module.\nRu: Включить модуль.\n\nDefault / По умолчанию: `false`"
+            },
+            "MACRO": {
+              "type": "string",
+              "default": "",
+              "markdownDescription": "En: Macro file path.\nRu: Путь к макросу."
+            },
+            "LIBRARY": {
+              "type": "string",
+              "default": "",
+              "markdownDescription": "En: Shared library path (.so) with constructor.\nRu: Путь к динамической библиотеке (.so) с конструктором."
+            },
+            "CONSTRUCTOR": {
+              "type": "string",
+              "default": "",
+              "markdownDescription": "En: Constructor class name created via `create<Name>()`.\nRu: Имя класса-конструктора создаваемого через `create<Name>()`."
+            }
+          }
+        }
+      }
+    }
+  }
+}

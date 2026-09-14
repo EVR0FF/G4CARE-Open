@@ -1,0 +1,119 @@
+# ── Демо: ExprTK-фильтры в NTuple ──
+# Демонстрирует возможности, недоступные в UI-командах Geant4:
+#   Условные фильтры на step/primary/secondary уровне:
+#     filter: "kinetic_energy > 0.5"        — только частицы с энергией > 0.5 MeV
+#     filter: "edep > 0.01"                 — только шаги с энерговыделением
+#   UI-команды Geant4 не имеют механизма фильтрации данных —
+#   все данные пишутся «как есть», без условного отбора.
+#
+# Ссылки на код:
+#   TreeManager.cc — PrecompileForFilter, ColType::Expression
+#   nameToFilterVar (95+ переменных: kinetic_energy, edep, step_length, Z, A, ...)
+#   filter_demo.yaml — реальный рабочий пример в проекте
+
+NTHREADS: 1
+OUTPUT_FILE: "demo_exprtk_ntuple.root"
+EVENTS: 5
+G4RUNMANAGER_PRINT_PROGRESS: 1
+VISUALIZATION: false
+
+# Пользовательский материал — невозможно в макросах (только NIST)
+materials:
+  SiAl5050:
+    name: "SiAl5050"
+    density: "2.33*g/cm3"
+    state: "solid"
+    elements:
+      0:
+        name: "Si"
+        Z: 14
+        abundance: 0.5
+      1:
+        name: "Al"
+        Z: 13
+        abundance: 0.5
+
+GEOMETRY:
+  OBJECTS:
+    target:
+      name: "target"
+      shape: "box"
+      material: "SiAl5050"
+      DIMENSIONS: ["10*mm", "10*mm", "10*mm"]
+      POSITION: [0, 0, 0]
+      isSensitive: false
+
+SOURCE_MODE: "flow"
+
+SOURCE:
+  co60:
+    type: "radioactive"
+    object: "target_LV"
+    ISOTOPES:
+      0:
+        name: "Co60"
+        Z: 27
+        A: 60
+        abundance: 1.0
+
+PHYSICS:
+  BASIC:
+    LIST: "FTFP_BERT"
+  ADVANCED:
+    RDECAY:
+      ENABLE: true
+  CUTS:
+    default: "0.1*mm"
+
+# ── 4 NTuple с разными ExprTK-фильтрами ──
+# Имена NTuple фиксированы: primary, secondary, g4care, ion_production
+NTUPLES: ["primary", "secondary", "g4care", "ion_production"]
+
+NTUPLE:
+  # Демо 1: primary — только первичные частицы с кинетической энергией > 0.5 MeV
+  primary:
+    filter: "kinetic_energy > 0.5"
+    columns:
+      - "event_id"
+      - "x"
+      - "y"
+      - "z"
+      - "kinetic_energy"
+      - "volume_name"
+      - "particle_name"
+
+  # Демо 2: secondary — только вторичные частицы с энергией > 0.1 MeV
+  secondary:
+    filter: "kinetic_energy > 0.1"
+    columns:
+      - "event_id"
+      - "kinetic_energy"
+      - "volume_name"
+      - "particle_name"
+
+  # Демо 3: g4care — только шаги с edep > 0.01 MeV
+  g4care:
+    filter: "edep > 0.01"
+    columns:
+      - "event_id"
+      - "x"
+      - "y"
+      - "z"
+      - "edep"
+      - "kinetic_energy"
+      - "step_length"
+      - "volume_name"
+
+  # Демо 4: ion_production — только тяжёлые ионы с Z > 1 + энергия > 0.05
+  ion_production:
+    filter: "Z > 1 and kinetic_energy > 0.05"
+    columns:
+      - "event_id"
+      - "x"
+      - "y"
+      - "z"
+      - "kinetic_energy"
+      - "Z"
+      - "A"
+      - "volume_name"
+      - "particle_name"

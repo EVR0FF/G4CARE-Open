@@ -1,0 +1,323 @@
+# ── Нано-мишень: 7 слоёв глина/вода в центре цилиндра Ø5×10 cm, электроны, G-фактор ──
+# Водные слои: чистый G4_WATER (для Geant4-DNA)
+# Глины: H+O (OH-группы), isSensitive: false
+# Envelope: цилиндр Ø5 cm × 10 cm
+# Все позиции АБСОЛЮТНЫЕ (world). Envelope и clay2 в центре мира (Z=0).
+
+NTHREADS: 8
+OUTPUT_FILE: "nano_e_gfactor.root"
+G4RUNMANAGER_PRINT_PROGRESS: 100
+EVENTS: 0
+VISUALIZATION: true
+ENABLE_DICTIONARY: false
+RUNACTION_VERBOSE: 1
+
+# ── Материалы ──
+materials:
+  AverageNanoTarget:
+    name: "AverageNanoTarget"
+    density: "1.6394*g/cm3"
+    state: "solid"
+    elements:
+      Al:
+        name: "Al"
+        Z: 13
+        abundance: 0.0696
+      Fe:
+        name: "Fe"
+        Z: 26
+        abundance: 0.0210
+      H:
+        name: "H"
+        Z: 1
+        abundance: 0.0461
+      Mg:
+        name: "Mg"
+        Z: 12
+        abundance: 0.0108
+      O:
+        name: "O"
+        Z: 8
+        abundance: 0.6633
+      Si:
+        name: "Si"
+        Z: 14
+        abundance: 0.1891
+
+  Clay1:
+    name: "Clay1"
+    density: "2.817*g/cm3"
+    state: "solid"
+    elements:
+      Al:
+        name: "Al"
+        Z: 13
+        abundance: 0.1126
+      Fe:
+        name: "Fe"
+        Z: 26
+        abundance: 0.0339
+      H:
+        name: "H"
+        Z: 1
+        abundance: 0.0055
+      Mg:
+        name: "Mg"
+        Z: 12
+        abundance: 0.0175
+      O:
+        name: "O"
+        Z: 8
+        abundance: 0.5245
+      Si:
+        name: "Si"
+        Z: 14
+        abundance: 0.3059
+
+  Clay2:
+    name: "Clay2"
+    density: "2.818*g/cm3"
+    state: "solid"
+    elements:
+      Al:
+        name: "Al"
+        Z: 13
+        abundance: 0.1126
+      Fe:
+        name: "Fe"
+        Z: 26
+        abundance: 0.0339
+      H:
+        name: "H"
+        Z: 1
+        abundance: 0.0055
+      Mg:
+        name: "Mg"
+        Z: 12
+        abundance: 0.0175
+      O:
+        name: "O"
+        Z: 8
+        abundance: 0.5245
+      Si:
+        name: "Si"
+        Z: 14
+        abundance: 0.3059
+
+  Clay3:
+    name: "Clay3"
+    density: "3.378*g/cm3"
+    state: "solid"
+    elements:
+      Al:
+        name: "Al"
+        Z: 13
+        abundance: 0.1126
+      Fe:
+        name: "Fe"
+        Z: 26
+        abundance: 0.0339
+      H:
+        name: "H"
+        Z: 1
+        abundance: 0.0055
+      Mg:
+        name: "Mg"
+        Z: 12
+        abundance: 0.0175
+      O:
+        name: "O"
+        Z: 8
+        abundance: 0.5245
+      Si:
+        name: "Si"
+        Z: 14
+        abundance: 0.3059
+
+# ── Геометрия: box 40×40×31 nm + 7 слоёв внутри ──
+GEOMETRY:
+  WORLD:
+    shape: "box"
+    material: "G4_AIR"
+    DIMENSIONS: ["20*cm", "20*cm", "30*cm"]
+  OBJECTS:
+    envelope:
+      name: "envelope"
+      shape: "tube"
+      material: "AverageNanoTarget"
+      DIMENSIONS: ["0*cm", "2.5*cm", "10*cm"]
+      POSITION: [0, 0, 0]
+      isSensitive: false
+      max_step_size: "0"
+
+    water1:
+      name: "water1"
+      shape: "box"
+      material: "G4_WATER"
+      mother: "envelope"
+      DIMENSIONS: ["3.115*nm", "5.412*nm", "0.92*nm"]
+      POSITION: [0, 0, "-3.38*nm"]
+      isSensitive: true
+      max_step_size: "0"
+      cuts:
+        e-: "1*eV"
+
+    clay1:
+      name: "clay1"
+      shape: "box"
+      material: "Clay1"
+      mother: "envelope"
+      DIMENSIONS: ["3.115*nm", "5.412*nm", "0.92*nm"]
+      POSITION: [0, 0, "-2.46*nm"]
+      isSensitive: false
+      max_step_size: "0"
+
+    water2:
+      name: "water2"
+      shape: "box"
+      material: "G4_WATER"
+      mother: "envelope"
+      DIMENSIONS: ["3.115*nm", "5.412*nm", "1.54*nm"]
+      POSITION: [0, 0, "-1.23*nm"]
+      isSensitive: true
+      max_step_size: "0"
+      cuts:
+        e-: "1*eV"
+
+    clay2:
+      name: "clay2"
+      shape: "box"
+      material: "Clay2"
+      mother: "envelope"
+      DIMENSIONS: ["3.115*nm", "5.412*nm", "0.92*nm"]
+      POSITION: [0, 0, 0]
+      isSensitive: false
+      max_step_size: "0"
+
+    water3:
+      name: "water3"
+      shape: "box"
+      material: "G4_WATER"
+      mother: "envelope"
+      DIMENSIONS: ["3.115*nm", "5.412*nm", "1.69*nm"]
+      POSITION: [0, 0, "1.305*nm"]
+      isSensitive: true
+      max_step_size: "0"
+      cuts:
+        e-: "1*eV"
+
+    clay3:
+      name: "clay3"
+      shape: "box"
+      material: "Clay3"
+      mother: "envelope"
+      DIMENSIONS: ["3.115*nm", "5.412*nm", "0.77*nm"]
+      POSITION: [0, 0, "2.535*nm"]
+      isSensitive: false
+      max_step_size: "0"
+
+    water4:
+      name: "water4"
+      shape: "box"
+      material: "G4_WATER"
+      mother: "envelope"
+      DIMENSIONS: ["3.115*nm", "5.412*nm", "0.92*nm"]
+      POSITION: [0, 0, "3.38*nm"]
+      isSensitive: true
+      max_step_size: "0"
+      cuts:
+        e-: "1*eV"
+
+# ── Источник: электроны, спектр Клейна-Нишины (0.1-1.09 МэВ) ──
+SOURCE_MODE: "flow"
+
+SOURCE:
+  e_punch:
+    type: "particleGun"
+    particle: "e-"
+    energy: "rand_uniform(0.1, 1.09)*MeV"
+    direction:
+      x: 0
+      y: 0
+      z: 1
+    pos:
+      x: "rand_uniform(-1.5575, 1.5575)*nm"
+      y: "rand_uniform(-2.706, 2.706)*nm"
+      z: "-3.38*nm"
+
+# ── Физика: ДНК-химия для G-фактора ──
+PHYSICS:
+  BASIC:
+    LIST: "FTFP_BERT"
+  ADVANCED:
+    EM_DNA:
+      ENABLE: true
+    EM_DNA_CHEM8:
+       ENABLE: true
+
+# ── Химия ──
+CHEMISTRY:
+  ENABLE: true
+  TIME_STEP_MODEL: "SBS"
+  END_TIME: "1.001*ps"
+  MAX_TIME_STEP: "0.001*ps"
+  SPECIES:
+    - "OH"
+    - "H"
+    - "e_aq"
+    - "H3O"
+    - "H2O2"
+    - "H2"
+    - "HO2"
+    - "O2"
+    - "OHm"
+    - "O"
+    - "O-"
+    - "H20p"
+  VOLUME:
+    - "water1"
+    - "water2"
+    - "water3"
+    - "water4"
+
+NTUPLES: ["g4care", "chem_tracks"]
+
+NTUPLE:
+  g4care:
+    columns:
+      - "particle_name"
+      - "kinetic_energy"
+      - "edep"
+      - "volume_name"
+      - "x"
+      - "y"
+      - "z"
+  chem_tracks:
+    columns:
+      - "particle_name"
+      - "x"
+      - "y"
+      - "z"
+      - "edep"
+      - "volume_name"
+
+EXPRS:
+  - NAME: "ChemRefTest"
+    VOLUME: ["water1", "water2", "water3", "water4"]
+    SCRIPT: |
+      g4cout('[SCORING] Chemistry @ t=', chem_end_ns, ' ns, edep=', chem_edep_eV, ' eV:');
+      g4cout('  Species    N_created    N_at_end  charge');
+      var total_q := 0;
+      for (var i := 0; i < chem_n_species; i += 1) {
+        var nCr := Nc[i];
+        var nAt := Nt[i];
+        var spQ := nAt * charge[i];
+        total_q += spQ;
+        g4cout('  ', species_name(i), ' ', nCr, ' ', nAt, ' ', spQ);
+      }
+      g4cout('[SCORING] TOTAL charge = ', total_q,
+              if(abs(total_q) < 0.001, ' (NEUTRAL)', ' (VIOLATION!)'));
+      var E_J := chem_edep_eV * 1.602176634e-19;
+      var my_dose_Gy := if(volume_mass > 0, E_J / volume_mass, 0);
+      g4cout('[SCORING] EDep=', chem_edep_eV, ' eV, mass=', volume_mass, ' kg, dose=', my_dose_Gy/1e6, ' MGy');
+

@@ -1,0 +1,170 @@
+# Конфигурация: ParticleGun источник гамма-квантов 1.3 МэВ в мишень Ø10×10 см
+# с детектором-зондом Ø1 мм внутри мишени для замера дозы
+
+# Состав мишени (атомные доли):
+#   Al: 7.43%  H: 23.54%  Mg: 0.86%  Na: 1.17%  O: 53.73%  Si: 13.27%
+
+NTHREADS: 8
+OUTPUT_FILE: "pg_gamma23_target_dose_probe.root"
+G4RUNMANAGER_PRINT_PROGRESS: 500000
+EVENTS: 1000000
+VISUALIZATION: false
+HEATMAP_EXPORT: true
+HEATMAP_FILE: "pg_gamma23_target_dose_probe.vtk"
+
+SOURCE_MODE: "flow"
+
+materials:
+  TargetMix:
+    name: "TargetMix"
+    density: "1.58*g/cm3"
+    state: "solid"
+    elements:
+      Al:
+        name: "Al"
+        Z: 13
+        abundance: 0.0743
+      H:
+        name: "H"
+        Z: 1
+        abundance: 0.2354
+      Mg:
+        name: "Mg"
+        Z: 12
+        abundance: 0.0086
+      Na:
+        name: "Na"
+        Z: 11
+        abundance: 0.0117
+      O:
+        name: "O"
+        Z: 8
+        abundance: 0.5373
+      Si:
+        name: "Si"
+        Z: 14
+        abundance: 0.1327
+
+GEOMETRY:
+  WORLD:
+    shape: "box"
+    material: "G4_AIR"
+    DIMENSIONS: ["31*cm", "31*cm", "31*cm"]
+
+  OBJECTS:
+    target:
+      name: "target"
+      shape: "tube"
+      material: "TargetMix"
+      DIMENSIONS: ["0*mm", "5*cm", "10*cm"]
+      POSITION: [0, 0, 0]
+      isSensitive: true
+      max_step_size: "0"
+
+   
+
+# ── Источник: Particle Gun, гамма 1.3 МэВ ──
+SOURCE:
+  gamma_gun:
+    type: "particleGun"
+    particle: "gamma"
+    energy: "1.3*MeV"
+    direction:
+      x: 0
+      y: 0
+      z: 1
+    pos:
+      x: 0
+      y: 0
+      z: "-15*cm"
+
+# ── Физика ──
+PHYSICS:
+  BASIC:
+    LIST: "FTFP_BERT"
+  ADVANCED:
+          STEPLIMITER:
+            ENABLE: false
+            MACRO: ""
+            LIBRARY: ""
+            CONSTRUCTOR: ""
+      
+          RDECAY:
+            ENABLE: false
+            MACRO: ""
+      
+          OPTICS:
+            ENABLE: false
+            MACRO: ""
+      
+          EM_OPTION0:
+            ENABLE: false
+      
+          EM_OPTION1:
+            ENABLE: false
+      
+          EM_OPTION2:
+            ENABLE: false
+      
+          EM_OPTION3:
+            ENABLE: false
+      
+          EM_OPTION4:
+            ENABLE: true
+      
+          EM_LIVERMORE:
+            ENABLE: false
+      
+          EM_PENELOPE:
+            ENABLE: false
+      
+          EM_DNA:
+            ENABLE: false
+      
+          EM_DNA_CHEM:
+            ENABLE: false
+      
+          EM_DNA_CHEM8:
+            ENABLE: false
+      
+          ION:
+            ENABLE: false
+      
+          DECAY:
+            ENABLE: false
+      
+          HADRON_ELASTIC:
+            ENABLE: false
+      
+NTUPLES: ["g4care"]
+
+NTUPLE:
+  g4care:
+    columns:
+      - "particle_name"
+      - "kinetic_energy"
+      - "niel"
+      - "edep"
+      - "volume_name"
+      - "process_name"
+  
+
+# ── Scoring: адаптивная сетка для карты доз в мишени ──
+SCORING:
+  TARGET_VOLUME_NAME: "target"
+  HALF_SIZE_X: "10*cm"
+  HALF_SIZE_Y: "10*cm"
+  HALF_SIZE_Z: "10*cm"
+  MAX_DEPTH: 8
+  MIN_EVENTS_PER_CELL: 10
+  GRADIENT_THRESHOLD: 0.05
+  MIN_EVENTS_MERGE: 5
+  SPLIT_COOLDOWN: 100
+  MERGE_COOLDOWN: 5000
+  MIN_EDEP_MEV: 0.0
+  MAX_REL_UNCERTAINTY: 1.0
+  MAX_TOTAL_NODES: 500000
+  REFINE_INTERVAL: 10000
+
+ENABLE_DICTIONARY: false
+

@@ -1,0 +1,166 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://g4care/schema/source",
+  "title": "SOURCE",
+  "description": "Particle source configuration.",
+  "type": "object",
+  "markdownDescription": "En: Particle source definitions. Each key is a source name, value is source config.\nRu: Определения источников частиц. Каждый ключ — имя источника, значение — конфигурация.\n\nSee: ParticleGunSource.cc, PrimaryGeneratorAction.cc.\n\nExample:\n```yaml\nSOURCE:\n  e_gun:\n    type: particleGun\n    particle: \"e-\"\n    energy: \"1*MeV\"\n    pos: {x: 0, y: 0, z: 0}\n    direction: {x: 0, y: 0, z: 1}\n```",
+  "properties": {
+    "SOURCE_MODE": {
+      "type": "string",
+      "enum": ["flow", "event"],
+      "default": "flow",
+      "markdownDescription": "En: Particle source mode.\n  `flow` — all sources generate particles in every event (default).\n  `event` — one source per event, selected by weight.\nRu: Режим источника частиц.\n  `flow` — все источники генерируют частицы в каждом событии (по умолчанию).\n  `event` — один источник на событие, выбирается по весу.\nDefault: `flow`."
+    }
+  },
+  "patternProperties": {
+    "^.*$": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["gps", "GPS", "particleGun", "activation", "radioactive", "mixture"],
+          "markdownDescription": "En: Source type.\n  `gps`/`GPS` — General Particle Source.\n  `particleGun` — fixed particle parameters.\n  `activation` — activation source.\n  `radioactive` — radioactive decay.\n  `mixture` — mix of multiple sources.\nRu: Тип источника.\n  `gps`/`GPS` — General Particle Source.\n  `particleGun` — фиксированные параметры.\n  `activation` — источник активации.\n  `radioactive` — радиоактивный распад.\n  `mixture` — смесь источников."
+        },
+        "weight": {
+          "type": "number", "default": 1.0,
+          "markdownDescription": "En: Source weight for mixture mode.\nRu: Вес источника для режима mixture.\nDefault: `1.0`."
+        },
+        "particle": {
+          "type": "string",
+          "markdownDescription": "En: Particle type (e.g. `e-`, `gamma`, `proton`).\nRu: Тип частицы (например `e-`, `gamma`, `proton`)."
+        },
+        "energy": {
+          "type": ["number", "string"],
+          "markdownDescription": "En: Particle energy with units.\nRu: Энергия частицы с единицами.\n\nExample: `\"1*MeV\"`, `100*keV`."
+        },
+        "direction": {
+          "type": "object",
+          "properties": { "x": { "type": ["number", "string"] }, "y": { "type": ["number", "string"] }, "z": { "type": ["number", "string"] } },
+          "markdownDescription": "En: Particle direction vector.\nRu: Вектор направления частицы.\nDefault: `{x: 0, y: 0, z: 1}`."
+        },
+        "pos": {
+          "type": "object",
+          "properties": { "x": { "type": ["number", "string"] }, "y": { "type": ["number", "string"] }, "z": { "type": ["number", "string"] } },
+          "markdownDescription": "En: Source position.\nRu: Позиция источника."
+        },
+        "time": { "type": ["number", "string"], "markdownDescription": "En: Global emission time.\nRu: Глобальное время испускания." },
+        "macro": { "type": "string", "markdownDescription": "En: Macro path for gps/particleGun/radioactive.\nRu: Путь к макросу." },
+        "vertex_mode": {
+          "type": "string", "enum": ["sequential", "random"],
+          "markdownDescription": "En: Vertex selection mode.\n  `sequential` — sequentially. `random` — randomly.\nRu: Режим выбора вершин."
+        },
+        "reject_if": { "type": "string", "markdownDescription": "En: Reject condition (ExprTK).\nRu: Условие отбрасывания (ExprTK)." },
+        "variables": {
+          "type": "object", "patternProperties": { "^.*$": { "type": "string" } },
+          "markdownDescription": "En: User variables for expressions.\nRu: Пользовательские переменные."
+        },
+        "data_alias": { "type": "string", "markdownDescription": "En: Data table alias for value substitution (ParticleGunSource).\nRu: Алиас таблицы данных (ParticleGunSource)." },
+        "data": { "type": "string", "markdownDescription": "En: Data alias name (ActivationSource). References a DATA block subsection.\nRu: Имя алиаса данных (ActivationSource). Ссылается на подсекцию блока DATA." },
+        "mode": {
+          "type": "string", "enum": ["sequential", "random"], "default": "sequential",
+          "markdownDescription": "En: Row selection mode (ActivationSource).\n  `sequential` — select rows in order.\n  `random` — uniform random row selection.\nRu: Режим выбора строк (ActivationSource).\nDefault: `sequential`."
+        },
+        "reset_time": { "type": "boolean", "default": true, "markdownDescription": "En: Reset emission time to 0 (ActivationSource).\nRu: Сбросить время эмиссии в 0 (ActivationSource).\nDefault: `true`." },
+        "loop": { "type": "boolean", "default": true, "markdownDescription": "En: Loop data table when exhausted (ActivationSource).\nRu: Зациклить таблицу данных при исчерпании (ActivationSource).\nDefault: `true`." },
+        "object": { "type": "string", "markdownDescription": "En: Logical volume name for volume-based vertex placement (RadioactiveSource).\nRu: Имя логического объёма для размещения вершин (RadioactiveSource)." },
+        "ISOTOPES": {
+          "type": "object",
+          "description": "Isotope definitions (RadioactiveSource).",
+          "markdownDescription": "En: Isotope definitions for radioactive source. Each key is a numeric index.\nRu: Определения изотопов для радиоактивного источника. Ключ — числовой индекс.\n\nExample:\n```yaml\nISOTOPES:\n  0:\n    name: Cs137\n    Z: 55\n    A: 137\n    abundance: 1.0\n    lifetime: \"30.08*year\"\n```",
+          "patternProperties": {
+            "^.*$": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "markdownDescription": "En: Isotope name (e.g. Cs137).\nRu: Имя изотопа." },
+                "Z": { "type": "integer", "minimum": 1, "markdownDescription": "En: Atomic number.\nRu: Атомный номер." },
+                "A": { "type": "integer", "minimum": 1, "markdownDescription": "En: Mass number.\nRu: Массовое число." },
+                "excitation": { "type": ["number", "string"], "default": 0, "markdownDescription": "En: Excitation energy with units.\nRu: Энергия возбуждения с единицами.\nDefault: `0`." },
+                "abundance": { "type": "number", "default": 1.0, "minimum": 0, "markdownDescription": "En: Relative abundance for selection.\nRu: Относительная распространённость.\nDefault: `1.0`." },
+                "lifetime": { "type": ["number", "string"], "default": 0, "markdownDescription": "En: Isotope lifetime with units.\nRu: Время жизни изотопа с единицами.\nDefault: `0`." }
+              }
+            }
+          }
+        },
+        "decay": {
+          "type": "object",
+          "description": "Radioactive decay configuration.",
+          "markdownDescription": "En: Radioactive decay options (RadioactiveSource). Passed to G4RadioactiveDecay.\nRu: Параметры радиоактивного распада (RadioactiveSource).",
+          "properties": {
+            "enable_photo_evaporation": { "type": "boolean", "default": true, "markdownDescription": "En: Enable photo-evaporation.\nRu: Включить фото-испарение.\nDefault: `true`." },
+            "enable_arm": { "type": "boolean", "default": true, "markdownDescription": "En: Enable atomic relaxation.\nRu: Включить атомную релаксацию.\nDefault: `true`." },
+            "macro": { "type": "string", "default": "", "markdownDescription": "En: Decay macro path executed after ion creation.\nRu: Путь к макросу распада после создания иона." }
+          }
+        },
+        "isomer_table": { "type": "string", "default": "", "markdownDescription": "En: Path to isomer table file (RadioactiveSource).\nRu: Путь к файлу таблицы изомеров." },
+        "components": {
+          "type": "object",
+          "description": "Mixture source components.",
+          "markdownDescription": "En: Component sources for mixture type. Each key is an index.\nRu: Компоненты источника типа mixture. Ключ — индекс.\n\nExample:\n```yaml\ncomponents:\n  0:\n    source: e_gun\n    weight: 0.5\n  1:\n    source: gamma_source\n    weight: 0.5\n```",
+          "patternProperties": {
+            "^.*$": {
+              "type": "object",
+              "properties": {
+                "source": { "type": "string", "markdownDescription": "En: Name of a previously defined SOURCE subsection.\nRu: Имя ранее определённой подсекции SOURCE." },
+                "weight": { "type": "number", "default": 1.0, "minimum": 0, "markdownDescription": "En: Relative weight of this component.\nRu: Относительный вес компонента.\nDefault: `1.0`." }
+              }
+            }
+          }
+        },
+        "VERTEX_GENERATOR": {
+          "$ref": "definitions.schema.json#/$defs/vertexGeneratorDef",
+          "markdownDescription": "En: Vertex generator definition for this source.\nRu: Определение генератора вершин для этого источника."
+        },
+        "VERTICES": {
+          "type": "object",
+          "markdownDescription": "En: Manual vertex definitions keyed by index.\nRu: Ручные определения вершин с ключом по индексу.",
+          "patternProperties": {
+            "^.*$": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean", "markdownDescription": "En: Enable this vertex.\nRu: Включить эту вершину." },
+                "pos": {
+                  "type": "object",
+                  "markdownDescription": "En: Vertex position.\nRu: Позиция вершины.",
+                  "properties": {
+                    "x": { "type": ["number", "string"], "markdownDescription": "En: X coordinate.\nRu: Координата X." },
+                    "y": { "type": ["number", "string"], "markdownDescription": "En: Y coordinate.\nRu: Координата Y." },
+                    "z": { "type": ["number", "string"], "markdownDescription": "En: Z coordinate.\nRu: Координата Z." }
+                  }
+                },
+                "time": { "type": ["number", "string"], "markdownDescription": "En: Emission time.\nRu: Время испускания." },
+                "weight": { "type": ["number", "string"], "markdownDescription": "En: Vertex weight.\nRu: Вес вершины." },
+                "reject_if": { "type": "string", "markdownDescription": "En: Reject condition (ExprTK).\nRu: Условие отбрасывания (ExprTK)." },
+                "PARTICLES": {
+                  "type": "object",
+                  "markdownDescription": "En: Particle definitions for this vertex.\nRu: Определения частиц для этой вершины.",
+                  "patternProperties": {
+                    "^.*$": {
+                      "type": "object",
+                      "properties": {
+                        "type": { "type": "string", "markdownDescription": "En: Particle type.\nRu: Тип частицы." },
+                        "energy": { "type": ["number", "string"], "markdownDescription": "En: Particle energy with units.\nRu: Энергия частицы с единицами." },
+                        "direction": {
+                          "type": "object",
+                          "markdownDescription": "En: Particle direction vector.\nRu: Вектор направления частицы.",
+                          "properties": {
+                            "x": { "type": ["number", "string"], "markdownDescription": "En: X component.\nRu: Компонента X." },
+                            "y": { "type": ["number", "string"], "markdownDescription": "En: Y component.\nRu: Компонента Y." },
+                            "z": { "type": ["number", "string"], "markdownDescription": "En: Z component.\nRu: Компонента Z." }
+                          }
+                        },
+                        "weight": { "type": ["number", "string"], "markdownDescription": "En: Particle weight.\nRu: Вес частицы." },
+                        "time": { "type": ["number", "string"], "markdownDescription": "En: Emission time.\nRu: Время испускания." }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

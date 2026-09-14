@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://g4care/schema/geometry",
+  "title": "GEOMETRY",
+  "description": "Detector geometry objects configuration.",
+  "type": "object",
+  "markdownDescription": "En: Detector geometry definition via GEOMETRY.OBJECTS subsections (ObjectManager.cc).\nRu: Определение геометрии детектора через подсекции GEOMETRY.OBJECTS (ObjectManager.cc).\n\nSee: ObjectManager.cc.\n\nExample:\n```yaml\nGEOMETRY:\n  OBJECTS:\n    target:\n      name: \"Target\"\n      shape: \"box\"\n      material: \"G4_WATER\"\n      DIMENSIONS: [\"5*cm\", \"5*cm\", \"5*cm\"]\n      POSITION: [0, 0, 0]\n      isSensitive: true\n```",
+  "properties": {
+    "OBJECTS": {
+      "type": "object",
+      "description": "Detector objects keyed by ID.",
+      "markdownDescription": "En: Detector objects. Each key is an object ID, value is object definition.\nRu: Объекты детектора. Каждый ключ — ID объекта, значение — определение объекта.\n\nConfiguration keys per object: name, shape, material, DIMENSIONS, POSITION, isSensitive, DIGITIZE.*, cuts.*, max_step_size, record_ion_production, isotopes, isotope.",
+      "patternProperties": {
+        "^.*$": { "$ref": "definitions.schema.json#/$defs/objectDef" }
+      }
+    }
+  }
+}

@@ -1,0 +1,28 @@
+# ── Тест: PHYSICS — BASIC, CUTS, ADVANCED ──
+EVENTS: 1
+VISUALIZATION: false
+
+GEOMETRY:
+  WORLD:
+    shape: "box"
+    material: "G4_AIR"
+    DIMENSIONS: ["1*m", "1*m", "1*m"]
+
+PHYSICS:
+  BASIC:
+    LIST: "QGSP_BERT_EMV"
+  CUTS:
+    default: "0.1*mm"
+    gamma: "0.01*mm"
+    e-: "0.01*mm"
+    e+: "0.01*mm"
+    proton: "0.1*mm"
+  ADVANCED:
+    STEPLIMITER:
+      ENABLE: true
+    RDECAY:
+      ENABLE: true
+    OPTICS:
+      ENABLE: false
+    EM_OPTION0:
+      ENABLE: false

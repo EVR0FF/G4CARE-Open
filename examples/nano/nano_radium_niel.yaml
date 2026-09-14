@@ -1,0 +1,368 @@
+# ── Нано-мишень: 7 слоёв глина/вода + внешний box 40×40×31 nm, Ra-226 (распад), NIEL/PKA ──
+# Без EVENTS — визуализация геометрии
+# Водные слои: оригинальные составы с ионами (Ca→Ra в WaterIons2/WaterIons3)
+# Глины: H+O (OH-группы), isSensitive: false
+# Источник: радиоактивный Ra-226 в водных слоях water2, water3
+# БЕЗ химии, БЕЗ G-фактора — только NIEL/DPA
+# Все позиции АБСОЛЮТНЫЕ (world). Envelope и clay2 в центре мира (Z=0).
+
+NTHREADS: 8
+OUTPUT_FILE: "nano_radium_niel.root"
+G4RUNMANAGER_PRINT_PROGRESS: 100
+VISUALIZATION: true
+ENABLE_DICTIONARY: false
+RUNACTION_VERBOSE: 1
+
+# ── Материалы ──
+materials:
+  AverageNanoTarget:
+    name: "AverageNanoTarget"
+    density: "1.6394*g/cm3"
+    state: "solid"
+    elements:
+      Al:
+        name: "Al"
+        Z: 13
+        abundance: 0.0696
+      Fe:
+        name: "Fe"
+        Z: 26
+        abundance: 0.0210
+      H:
+        name: "H"
+        Z: 1
+        abundance: 0.0445
+      Mg:
+        name: "Mg"
+        Z: 12
+        abundance: 0.0108
+      O:
+        name: "O"
+        Z: 8
+        abundance: 0.6534
+      Si:
+        name: "Si"
+        Z: 14
+        abundance: 0.1891
+      Cl:
+        name: "Cl"
+        Z: 17
+        abundance: 0.0003
+      Ra:
+        name: "Ra"
+        Z: 88
+        abundance: 0.0025
+      K:
+        name: "K"
+        Z: 19
+        abundance: 0.0012
+      Na:
+        name: "Na"
+        Z: 11
+        abundance: 0.0074
+
+  Clay1:
+    name: "Clay1"
+    density: "2.817*g/cm3"
+    state: "solid"
+    elements:
+      Al:
+        name: "Al"
+        Z: 13
+        abundance: 0.1126
+      Fe:
+        name: "Fe"
+        Z: 26
+        abundance: 0.0339
+      H:
+        name: "H"
+        Z: 1
+        abundance: 0.0055
+      Mg:
+        name: "Mg"
+        Z: 12
+        abundance: 0.0175
+      O:
+        name: "O"
+        Z: 8
+        abundance: 0.5245
+      Si:
+        name: "Si"
+        Z: 14
+        abundance: 0.3059
+
+  Clay2:
+    name: "Clay2"
+    density: "2.818*g/cm3"
+    state: "solid"
+    elements:
+      Al:
+        name: "Al"
+        Z: 13
+        abundance: 0.1126
+      Fe:
+        name: "Fe"
+        Z: 26
+        abundance: 0.0339
+      H:
+        name: "H"
+        Z: 1
+        abundance: 0.0055
+      Mg:
+        name: "Mg"
+        Z: 12
+        abundance: 0.0175
+      O:
+        name: "O"
+        Z: 8
+        abundance: 0.5245
+      Si:
+        name: "Si"
+        Z: 14
+        abundance: 0.3059
+
+  Clay3:
+    name: "Clay3"
+    density: "3.378*g/cm3"
+    state: "solid"
+    elements:
+      Al:
+        name: "Al"
+        Z: 13
+        abundance: 0.1126
+      Fe:
+        name: "Fe"
+        Z: 26
+        abundance: 0.0339
+      H:
+        name: "H"
+        Z: 1
+        abundance: 0.0055
+      Mg:
+        name: "Mg"
+        Z: 12
+        abundance: 0.0175
+      O:
+        name: "O"
+        Z: 8
+        abundance: 0.5245
+      Si:
+        name: "Si"
+        Z: 14
+        abundance: 0.3059
+
+  WaterIons1:
+    name: "WaterIons1"
+    density: "0.958*g/cm3"
+    state: "liquid"
+    elements:
+      Cl:
+        name: "Cl"
+        Z: 17
+        abundance: 0.0040
+      H:
+        name: "H"
+        Z: 1
+        abundance: 0.1085
+      Na:
+        name: "Na"
+        Z: 11
+        abundance: 0.0256
+      O:
+        name: "O"
+        Z: 8
+        abundance: 0.8619
+
+  WaterIons2:
+    name: "WaterIons2"
+    density: "1.007*g/cm3"
+    state: "liquid"
+    elements:
+      Ra:
+        name: "Ra"
+        Z: 88
+        abundance: 0.0102
+      H:
+        name: "H"
+        Z: 1
+        abundance: 0.1063
+      K:
+        name: "K"
+        Z: 19
+        abundance: 0.0050
+      Na:
+        name: "Na"
+        Z: 11
+        abundance: 0.0146
+      O:
+        name: "O"
+        Z: 8
+        abundance: 0.8639
+
+  WaterIons3:
+    name: "WaterIons3"
+    density: "0.917*g/cm3"
+    state: "liquid"
+    elements:
+      Ra:
+        name: "Ra"
+        Z: 88
+        abundance: 0.0102
+      H:
+        name: "H"
+        Z: 1
+        abundance: 0.1084
+      K:
+        name: "K"
+        Z: 19
+        abundance: 0.0050
+      Na:
+        name: "Na"
+        Z: 11
+        abundance: 0.0146
+      O:
+        name: "O"
+        Z: 8
+        abundance: 0.8618
+
+  WaterIons4:
+    name: "WaterIons4"
+    density: "0.895*g/cm3"
+    state: "liquid"
+    elements:
+      H:
+        name: "H"
+        Z: 1
+        abundance: 0.1085
+      Na:
+        name: "Na"
+        Z: 11
+        abundance: 0.0302
+      O:
+        name: "O"
+        Z: 8
+        abundance: 0.8613
+
+# ── Геометрия: бокс и clay2 в центре мира (Z=0) ──
+GEOMETRY:
+  WORLD:
+    shape: "box"
+    material: "G4_AIR"
+    DIMENSIONS: ["50*nm", "50*nm", "35*nm"]
+
+  OBJECTS:
+    envelope:
+      name: "envelope"
+      shape: "box"
+      material: "AverageNanoTarget"
+      DIMENSIONS: ["40*nm", "40*nm", "31*nm"]
+      POSITION: [0, 0, 0]
+      isSensitive: false
+      max_step_size: "0"
+
+    water1:
+      name: "water1"
+      shape: "box"
+      material: "WaterIons1"
+      DIMENSIONS: ["3.115*nm", "5.412*nm", "0.92*nm"]
+      POSITION: [0, 0, "-3.38*nm"]
+      isSensitive: true
+      max_step_size: "0"
+
+    clay1:
+      name: "clay1"
+      shape: "box"
+      material: "Clay1"
+      DIMENSIONS: ["3.115*nm", "5.412*nm", "0.92*nm"]
+      POSITION: [0, 0, "-2.46*nm"]
+      isSensitive: false
+      max_step_size: "0"
+
+    water2:
+      name: "water2"
+      shape: "box"
+      material: "WaterIons2"
+      DIMENSIONS: ["3.115*nm", "5.412*nm", "1.54*nm"]
+      POSITION: [0, 0, "-1.23*nm"]
+      isSensitive: true
+      max_step_size: "0"
+
+    clay2:
+      name: "clay2"
+      shape: "box"
+      material: "Clay2"
+      DIMENSIONS: ["3.115*nm", "5.412*nm", "0.92*nm"]
+      POSITION: [0, 0, 0]
+      isSensitive: false
+      max_step_size: "0"
+
+    water3:
+      name: "water3"
+      shape: "box"
+      material: "WaterIons3"
+      DIMENSIONS: ["3.115*nm", "5.412*nm", "1.69*nm"]
+      POSITION: [0, 0, "1.305*nm"]
+      isSensitive: true
+      max_step_size: "0"
+
+    clay3:
+      name: "clay3"
+      shape: "box"
+      material: "Clay3"
+      DIMENSIONS: ["3.115*nm", "5.412*nm", "0.77*nm"]
+      POSITION: [0, 0, "2.535*nm"]
+      isSensitive: false
+      max_step_size: "0"
+
+    water4:
+      name: "water4"
+      shape: "box"
+      material: "WaterIons4"
+      DIMENSIONS: ["3.115*nm", "5.412*nm", "0.92*nm"]
+      POSITION: [0, 0, "3.38*nm"]
+      isSensitive: true
+      max_step_size: "0"
+
+# ── Источник: радиоактивный Ra-226 в водных слоях ──
+SOURCE_MODE: "flow"
+
+SOURCE:
+  radium_water2:
+    type: "radioactive"
+    ISOTOPES:
+      Ra226:
+        name: "Ra226"
+    object: "water2"
+
+  radium_water3:
+    type: "radioactive"
+    ISOTOPES:
+      Ra226:
+        name: "Ra226"
+    object: "water3"
+
+# ── Физика: Radioactive Decay для распада Ra ──
+PHYSICS:
+  BASIC:
+    LIST: "FTFP_BERT"
+  ADVANCED:
+    EM_OPTION4:
+      ENABLE: true
+    RDECAY:
+      ENABLE: true
+
+NTUPLES: ["g4care"]
+
+NTUPLE:
+  g4care:
+    columns:
+      - "particle_name"
+      - "kinetic_energy"
+      - "niel"
+      - "dpa"
+      - "edep"
+      - "volume_name"
+      - "process_name"
+      - "x"
+      - "y"
+      - "z"

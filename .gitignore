@@ -1,0 +1,38 @@
+# Build directories
+build/
+build_*/
+cmake-build-*/
+
+# CMake / generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+DartConfiguration.tcl
+Makefile
+
+# Compiled objects / libraries / binaries
+*.o
+*.a
+*.so
+*.exe
+/G4CARE
+
+# ROOT / simulation output
+*.root
+*.vtk
+*.vtu
+*.out
+
+# Python / virtualenv
+.venv/
+__pycache__/
+*.pyc
+
+# IDE — keep only the JSON-Schema definitions
+.vscode/*
+!.vscode/schemas/
+
+# Misc
+tmp/
+History

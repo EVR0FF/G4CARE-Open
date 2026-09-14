@@ -1,0 +1,8 @@
+/control/echo Stage 1: Preparing the track (G4CARE)
+/vis/viewer/set/targetPoint 20 10 0 nm
+
+/control/alias thePhi 0
+/control/alias startTheta -70
+/vis/viewer/set/viewpointThetaPhi {startTheta} {thePhi}
+
+# beam.in не вызываем — симуляцию запускает StageManager

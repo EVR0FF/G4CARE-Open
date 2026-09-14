@@ -1,0 +1,87 @@
+# ── Тест: xray_TESdetector — эквивалент Geant4 примера ──
+# Source: mathematical sphere (mirrors official PrimaryGeneratorAction)
+# VERTEX_GENERATOR modes (mutually exclusive, priority order):
+#   1. radius + center  → mathematical sphere (uniform surface sampling)
+#   2. surface          → SurfaceSampler on named G4 volume
+#   3. volume           → PositionSampler inside named G4 volume
+# ExprTK variables available in pos/energy/direction expressions:
+#   event_id, v_i, surf_x, surf_y, surf_z, surf_dx, surf_dy, surf_dz,
+#   vol_x, vol_y, vol_z
+EVENTS: 1000
+NTHREADS: 1
+VISUALIZATION: false
+OUTPUT_FILE: "test_xray_tes.root"
+G4RUNMANAGER_PRINT_PROGRESS: 100
+SEED: [123, 2004]
+ENABLE_DICTIONARY: false
+
+GEOMETRY:
+  FILE: "xray_TESdetector.gdml"
+
+SOURCE:
+  pamela_protons:
+    type: "particleGun"
+    VERTEX_GENERATOR:
+      radius: "27*cm"
+      center:
+        x: "0*mm"
+        y: "0*mm"
+        z: "80*mm"
+      pos:
+        x: "surf_x"
+        y: "surf_y"
+        z: "surf_z"
+      count: 1
+      PARTICLES:
+        0:
+          particle: "proton"
+          energy: "pamela_accept()"
+
+PHYSICS:
+  BASIC:
+    LIST: ""
+  ADVANCED:
+    SpacePhysics_QBBC:
+      ENABLE: true
+      LIBRARY: "./libSpacePhysics_QBBC.so"
+      CONSTRUCTOR: "SpacePhysics_QBBC"
+  EM_REGIONS:
+    inner:
+      REGION: "InnerRegion"
+      PHYSICS: "G4EmStandardSS"
+      VOLUMES:
+        - "*"
+
+# NTUPLES types:
+#   primary  — per-event (1 row/event, emission position + energy)
+#   g4care   — per-step (all Geant4 steps, all volumes — HUGE output,
+#              use with filter.volumes or filter.condition)
+NTUPLES: ["primary"]
+NTUPLE:
+  primary:
+    columns:
+      - "particle_name"
+      - "kinetic_energy"
+      - "pre_kinetic_energy"
+      - "x"
+      - "y"
+      - "z"
+      - "theta"
+      - "phi"
+
+EXPRS:
+  - NAME: "total_edep"
+    VOLUME: "*"
+    EXCLUDE:
+      - "*Shield*"
+      - "*Cryostat*"
+      - "expHall*"
+    N_RUN: 1
+    SCRIPT: |
+      g4cout('EXPRS total edep (detector)=', edep, ' MeV');
+  - NAME: "bipxl_edep"
+    VOLUME: "Bipxl_log"
+    N_RUN: 1
+    SCRIPT: |
+      g4cout('EXPRS Bipxl edep =', edep, ' MeV');
+      
