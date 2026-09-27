@@ -74,11 +74,11 @@ From: ubuntu:24.04
     /tmp/geant4-data.tar /tmp/geant4-data.tar
     /tmp/root.tar /tmp/root.tar
 
-    # G4CARE binary
-    /home/ever/GProjects/G4CARE/build/G4CARE /opt/g4care/G4CARE
+    # G4CARE binary — adjust the source path to your build directory
+    /path/to/G4CARE/build/G4CARE /opt/g4care/G4CARE
 
-    # Example YAML configs
-    /home/ever/GProjects/G4CARE/build_asan/*.yaml /opt/g4care/configs/
+    # Example YAML configs — adjust the source path to your configs
+    /path/to/G4CARE/examples/**/*.yaml /opt/g4care/configs/
 
 %environment
     export GEANT4_DIR=/opt/geant4

@@ -19,14 +19,23 @@ if ! command -v apptainer &>/dev/null; then
     exit 1
 fi
 
+# --- Source paths (adjust to your environment) ---
+REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
+G4CARE_BINARY="${G4CARE_BINARY:-$REPO_DIR/build/G4CARE}"
+GEANT4_INSTALL_DIR="${GEANT4_INSTALL_DIR:-/path/to/geant4-install}"
+GEANT4_DATA_DIR="${GEANT4_DATA_DIR:-/path/to/geant4-data}"
+ROOT_INSTALL_DIR="${ROOT_INSTALL_DIR:-/path/to/root-install}"
+
 # Check source directories exist
 for dir in \
-    /home/ever/software/geant4-11.4.0/geant4-v11.4.0-install \
-    /home/ever/software/geant4-11.4.0/data \
-    /home/ever/software/ROOT/install \
-    /home/ever/GProjects/G4CARE/build/G4CARE; do
+    "$GEANT4_INSTALL_DIR" \
+    "$GEANT4_DATA_DIR" \
+    "$ROOT_INSTALL_DIR" \
+    "$G4CARE_BINARY"; do
     if [ ! -e "$dir" ]; then
         echo "ERROR: Source path not found: $dir"
+        echo "       Set GEANT4_INSTALL_DIR, GEANT4_DATA_DIR, ROOT_INSTALL_DIR"
+        echo "       and build G4CARE (build/G4CARE) before running this script."
         exit 1
     fi
 done

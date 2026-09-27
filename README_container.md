@@ -5,7 +5,7 @@
 ## Сборка контейнера (на этой машине)
 
 ```bash
-cd /home/ever/GProjects/G4CARE
+cd /path/to/G4CARE
 chmod +x build_container.sh
 ./build_container.sh
 ```
