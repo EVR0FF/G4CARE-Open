@@ -36,4 +36,7 @@ __pycache__/
 # Misc
 tmp/
 History
-build/
+
+# Compiled test helpers (extensionless ELF binaries)
+examples/tests/compare_tes
+examples/tests/compare_tes_primary
