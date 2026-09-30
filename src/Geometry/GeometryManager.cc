@@ -37,6 +37,11 @@
 #include "G4UIcmdWithADoubleAndUnit.hh"
 #include "SensitiveDetector.hh"
 #include "ObjectManager.hh"
+#include "DICOMReader.hh"
+#include "DICOMResampler.hh"
+#include "HUToMaterialMap.hh"
+#include "Rasterizer.hh"
+#include "VoxelizedPhantom.hh"
 #include "G4GDMLParser.hh"
 #include "G4NistManager.hh"
 #include "G4Box.hh"
@@ -230,6 +235,11 @@ GeometryManager::GeometryManager()
 }
 
 GeometryManager::~GeometryManager() = default;
+
+/// @return The DICOM voxel phantom container LV (nullptr if not built).
+G4LogicalVolume* GeometryManager::GetDicomPhantomLV() const {
+    return fDicomPhantom ? fDicomPhantom->GetContainerLV() : nullptr;
+}
 
 /// @brief Build the world volume, target box and place OBJECT objects.
 ///
@@ -425,6 +435,106 @@ G4VPhysicalVolume* GeometryManager::Construct() {
     // ---- Place OBJECTS into the world ----
     fObjectManager->PlaceObjects(logicWorld);
 
+    // ---- DICOM voxel phantom (CT -> HU -> material) ----
+    if (cfg->GetBool("GEOMETRY.DICOM.ENABLE", false)) {
+        std::string ctDir = cfg->GetString("GEOMETRY.DICOM.CT_DIR", "");
+        if (ctDir.empty()) {
+            G4cerr << "[GeometryManager] GEOMETRY.DICOM.ENABLE set but CT_DIR is empty." << G4endl;
+        } else {
+#ifdef G4CARE_HAS_DICOM
+            DICOMReader dicom;
+            CTSeries ct;
+            if (dicom.ReadCTSeries(ctDir, ct)) {
+                if (ct.tilted) {
+                    if (cfg->GetBool("GEOMETRY.DICOM.STRICT_TILT", false)) {
+                        G4cerr << "[GeometryManager] ERROR: gantry tilt " << ct.tiltAngleDeg
+                               << " deg (STRICT_TILT=true); skipping phantom." << G4endl;
+                        ct.valid = false;
+                    } else if (cfg->GetBool("GEOMETRY.DICOM.RESAMPLE_TILT", true)) {
+                        CTSeries resampled;
+                        if (DICOMResampler::ResampleToAxisAligned(ct, resampled)) {
+                            G4cout << "[GeometryManager] Resampled tilted CT to axis-aligned grid: "
+                                   << resampled.nx << "x" << resampled.ny << "x" << resampled.nz
+                                   << G4endl;
+                            ct = std::move(resampled);
+                        } else {
+                            G4cerr << "[GeometryManager] Resampling failed; building raw grid."
+                                   << G4endl;
+                        }
+                    } else {
+                        G4cerr << "[GeometryManager] WARNING: gantry tilt " << ct.tiltAngleDeg
+                               << " deg; RESAMPLE_TILT=false (raw axis-aligned grid, inaccurate)."
+                               << G4endl;
+                    }
+                }
+                if (ct.valid) {
+                    const std::string axesStr = cfg->GetString("GEOMETRY.DICOM.AXES", "LPS");
+                    const DicomAxes axes = (axesStr == "RAS") ? DicomAxes::RAS : DicomAxes::LPS;
+                    HUToMaterialMap huMap;
+                    fDicomPhantom = std::make_unique<VoxelizedPhantom>();
+                    if (!fDicomPhantom->Build(ct, huMap, logicWorld, axes)) {
+                        G4cerr << "[GeometryManager] Phantom build failed (oblique acquisition?)."
+                               << G4endl;
+                    }
+
+                    // RTSTRUCT -> organ labels (rasterised onto the CT grid).
+                    const std::string rtFile = cfg->GetString("GEOMETRY.DICOM.RTSTRUCT_FILE", "");
+                    if (!rtFile.empty() && fDicomPhantom->GetContainerLV()) {
+                        RTStruct rt;
+                        if (dicom.ReadRTStruct(rtFile, rt)) {
+                            std::vector<int> labels;
+                            if (DICOMRasterizer::Rasterize(ct, rt, labels)) {
+                                std::vector<std::string> names;
+                                names.reserve(rt.rois.size());
+                                for (const auto& r : rt.rois) names.push_back(r.name);
+                                fDicomPhantom->SetOrganNames(names);
+                                fDicomPhantom->SetOrganLabelsFromCT(labels);
+                                G4cout << "[GeometryManager] " << rt.rois.size()
+                                       << " organ ROIs rasterised." << G4endl;
+                            }
+                        }
+                    }
+
+                    // RTPLAN -> treatment beams (logged; auto source wiring).
+                    const std::string rpFile = cfg->GetString("GEOMETRY.DICOM.RTPLAN_FILE", "");
+                    if (!rpFile.empty()) {
+                        RTPlan plan;
+                        if (dicom.ReadRTPlan(rpFile, plan)) {
+                            for (const auto& b : plan.beams) {
+                                if (b.controlPoints.empty()) continue;
+                                const auto& cp = b.controlPoints.front();
+                                double dir[3];
+                                RTPlan::BeamDirection(cp.gantryAngleDeg, cp.couchAngleDeg, dir);
+                                G4cout << "[GeometryManager] Beam #" << b.number << " '"
+                                       << b.name << "' " << b.radiationType
+                                       << " E=" << cp.energyMeV << " MeV gantry="
+                                       << cp.gantryAngleDeg << " deg dir=("
+                                       << dir[0] << "," << dir[1] << "," << dir[2] << ")"
+                                       << G4endl;
+                            }
+                        }
+                    }
+
+                    // RTDOSE -> reference dose grid (logged; comparison).
+                    const std::string rdFile = cfg->GetString("GEOMETRY.DICOM.RTDOSE_FILE", "");
+                    if (!rdFile.empty()) {
+                        RTDose rd;
+                        if (dicom.ReadRTDose(rdFile, rd)) {
+                            G4cout << "[GeometryManager] RTDOSE grid " << rd.nx << "x"
+                                   << rd.ny << "x" << rd.nz << " units=" << rd.doseUnits
+                                   << G4endl;
+                        }
+                    }
+                }
+            } else {
+                G4cerr << "[GeometryManager] Failed to read CT series from: " << ctDir << G4endl;
+            }
+#else
+            G4cerr << "[GeometryManager] DICOM requested but G4CARE built without GDCM." << G4endl;
+#endif
+        }
+    }
+
     FieldManager::Instance()->ApplyFields();
     return physWorld;
 }
@@ -455,6 +565,29 @@ void GeometryManager::ConstructSDandField() {
             int detId = detReg->RegisterDetector(sd, sdName, DetectorProperties());
             static_cast<SensitiveDetector*>(sd)->SetDetectorID(detId);
             fTargetPV->GetLogicalVolume()->SetSensitiveDetector(sd);
+        }
+    }
+
+    // DICOM phantom voxel sensitive detector (records edep + voxel copy number).
+    bool dicomSensitive = ConfigManager::Instance()->GetBool("GEOMETRY.DICOM.IS_SENSITIVE", false);
+    if (dicomSensitive && fDicomPhantom && fDicomPhantom->GetVoxelLV()) {
+        G4String sdName = "PhantomVoxel_SD";
+        G4VSensitiveDetector* sd = sdManager->FindSensitiveDetector(sdName, false);
+        if (!sd) {
+            if (!isMaster) {
+                G4cerr << "[GeometryManager] WARNING: PhantomVoxel_SD not found in worker."
+                       << G4endl;
+            } else {
+                sd = new SensitiveDetector(sdName);
+                sdManager->AddNewDetector(sd);
+            }
+        }
+        if (sd) {
+            int detId = detReg->RegisterDetector(sd, sdName, DetectorProperties());
+            static_cast<SensitiveDetector*>(sd)->SetDetectorID(detId);
+            fDicomPhantom->GetVoxelLV()->SetSensitiveDetector(sd);
+            G4cout << "[GeometryManager] SD 'PhantomVoxel_SD' attached to phantom voxels (detID="
+                   << detId << ")." << G4endl;
         }
     }
 

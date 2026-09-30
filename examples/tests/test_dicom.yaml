@@ -1,0 +1,32 @@
+# ── Тест: DICOM импорт (CT → воксельный фантом + RTSTRUCT/RTPLAN/RTDOSE) ──
+# Требует сборки с -DG4CARE_WITH_DICOM=ON (библиотека GDCM).
+EVENTS: 10
+VISUALIZATION: false
+
+GEOMETRY:
+  WORLD:
+    shape: "box"
+    material: "G4_AIR"
+    DIMENSIONS: ["1*m", "1*m", "1*m"]
+  DICOM:
+    ENABLE: true
+    CT_DIR: /path/to/dicom/ct              # папка со срезами CT (DICOM)
+    RTSTRUCT_FILE: /path/to/rtstruct.dcm   # контуры органов (опц.)
+    RTPLAN_FILE: /path/to/rtplan.dcm       # план лечения (опц.)
+    RTDOSE_FILE: /path/to/rtdose.dcm       # референсная доза (опц.)
+    AXES: "LPS"          # LPS (по умолчанию) | RAS (переворот X/Y)
+    STRICT_TILT: false   # true = ошибка при наклоне гантри
+    RESAMPLE_TILT: true  # ресемплинг наклонных срезов на осевую сетку
+    IS_SENSITIVE: true   # записывать энерговыделение в вокселях (номер вокселя в хитах)
+
+SOURCE:
+  e_gun:
+    type: "particleGun"
+    particle: "e-"
+    energy: "6*MeV"
+    direction: { x: 0, y: 0, z: 1 }
+    pos: { x: 0, y: 0, z: "-40*cm" }
+
+PHYSICS:
+  BASIC:
+    LIST: "QGSP_BERT_EMV"

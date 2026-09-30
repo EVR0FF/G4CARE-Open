@@ -44,7 +44,11 @@ From: ubuntu:24.04
         libxft2 \
         libxpm4 \
         libafterimage0 \
-        libssl3t64
+        libssl3t64 \
+        libgdcm-dev \
+        libgdcm-tools \
+        libcharls-dev \
+        libopenjp2-7
 
     apt-get clean
     rm -rf /var/lib/apt/lists/*

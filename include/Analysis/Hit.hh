@@ -50,6 +50,7 @@ public:
     void SetStripNumber(G4int n) { fStripNumber = n; }
     void SetPlaneNumber(G4int n) { fPlaneNumber = n; }
     void SetIsXPlane(G4int v) { fIsXPlane = v; }
+    void SetVoxelIndex(G4int n) { fVoxelIndex = n; }
 
     G4double GetEdep() const { return fEdep; }
     G4double GetTime() const { return fTime; }
@@ -59,6 +60,7 @@ public:
     G4int GetStripNumber() const { return fStripNumber; }
     G4int GetPlaneNumber() const { return fPlaneNumber; }
     G4int GetIsXPlane() const { return fIsXPlane; }
+    G4int GetVoxelIndex() const { return fVoxelIndex; }
 
 private:
     G4double fEdep;
@@ -69,6 +71,7 @@ private:
     G4int fStripNumber = -1;
     G4int fPlaneNumber = -1;
     G4int fIsXPlane = -1;
+    G4int fVoxelIndex = -1;   ///< Voxel copy number (phantom parameterisation).
 };
 
 using HitsCollection = G4THitsCollection<Hit>;

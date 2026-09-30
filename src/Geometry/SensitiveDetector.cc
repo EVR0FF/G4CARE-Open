@@ -88,6 +88,9 @@ G4bool SensitiveDetector::ProcessHits(G4Step* step, G4TouchableHistory*) {
     G4int depth = touchable->GetHistoryDepth();
     if (depth >= 1) hit->SetStripNumber(touchable->GetReplicaNumber(0));
     if (depth >= 2) hit->SetPlaneNumber(touchable->GetReplicaNumber(1));
+    // For a voxel phantom (G4PVParameterised) the copy number at level 0 is
+    // the voxel index (iz*(nx*ny) + iy*nx + ix).
+    if (depth >= 1) hit->SetVoxelIndex(touchable->GetReplicaNumber(0));
     // isXPlane is inferred from volume name convention (X-plane has capital X in name)
     G4String volName = touchable->GetVolume(0)->GetName();
     hit->SetIsXPlane((volName.find("X") != std::string::npos && volName.find("Y") == std::string::npos) ? 1 : 0);

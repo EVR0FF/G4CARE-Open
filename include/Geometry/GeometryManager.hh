@@ -53,6 +53,7 @@
 
 class ObjectManager;
 class G4LogicalVolume;
+class VoxelizedPhantom;
 
 /// @brief Top-level geometry construction: world, target, objects, SDs.
 ///
@@ -79,6 +80,8 @@ public:
     ObjectManager* GetObjectManager() const { return fObjectManager.get(); }
     /// @return The DetectorRegistry instance.
     DetectorRegistry* GetDetectorRegistry() const { return fDetectorRegistry.get(); }
+    /// @return The DICOM voxel phantom container LV (nullptr if not built).
+    G4LogicalVolume* GetDicomPhantomLV() const;
 
     /// @brief Set an external GDML file to override default geometry.
     void SetGeometryFile(const G4String& filename) { fGeometryFile = filename; }
@@ -94,6 +97,7 @@ private:
     G4GDMLParser fParser;                                ///< GDML file parser.
     std::unique_ptr<ObjectManager> fObjectManager;       ///< Manages OBJECT block objects.
     std::unique_ptr<DetectorRegistry> fDetectorRegistry; ///< Registry for SensitiveDetectors.
+    std::unique_ptr<VoxelizedPhantom> fDicomPhantom;     ///< DICOM voxel phantom (CT).
     G4String fGeometryFile;                              ///< Optional GDML file path.
     std::string Trim(const std::string& s);               ///< String trim helper.
 };

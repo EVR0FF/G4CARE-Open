@@ -13,6 +13,12 @@ find_package(Geant4 REQUIRED ui_all vis_all)
 find_package(ROOT REQUIRED)
 find_package(TBB REQUIRED)
 
+# ── Optional DICOM import (GDCM) ────────────────────────────────────────────
+option(G4CARE_WITH_DICOM "Enable GDCM-based DICOM import (CT phantom, RTSTRUCT, RTPLAN, RTDOSE)" OFF)
+if(G4CARE_WITH_DICOM)
+    find_package(GDCM REQUIRED)
+endif()
+
 # yaml-cpp is vendored with only include/ and src/ shipped; the tests and
 # tools subdirectories are not part of the repository, so disable them.
 set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
@@ -45,6 +51,14 @@ target_link_libraries(G4CARE
     ROOT::ROOTNTuple
     yaml-cpp
 )
+
+if(G4CARE_WITH_DICOM)
+    target_include_directories(G4CARE PRIVATE ${GDCM_INCLUDE_DIRS})
+    # GDCM's install-tree config leaves GDCM_LIBRARIES empty; link the imported
+    # targets directly. gdcmMSFF transitively pulls gdcmIOD/DSED/DICT/Common.
+    target_link_libraries(G4CARE gdcmMSFF gdcmMEXD)
+    target_compile_definitions(G4CARE PRIVATE G4CARE_HAS_DICOM)
+endif()
 
 target_compile_options(G4CARE PRIVATE 
     $<$<CONFIG:Release>:-O2 -DNDEBUG>

@@ -13,6 +13,9 @@
       "patternProperties": {
         "^.*$": { "$ref": "definitions.schema.json#/$defs/objectDef" }
       }
+    },
+    "DICOM": {
+      "$ref": "dicom.schema.json"
     }
   }
 }

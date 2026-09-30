@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://g4care/schema/dicom",
+  "title": "GEOMETRY.DICOM",
+  "description": "DICOM import configuration.",
+  "type": "object",
+  "markdownDescription": "En: DICOM import — CT voxel phantom, RTSTRUCT organ contours, RTPLAN beams, RTDOSE reference dose. Requires build with `-DG4CARE_WITH_DICOM=ON` (GDCM).\nRu: Импорт DICOM — воксельный фантом из CT, контуры органов RTSTRUCT, пучки RTPLAN, референсная доза RTDOSE. Требует сборки с `-DG4CARE_WITH_DICOM=ON` (GDCM).\n\nSee: DICOMReader.cc, VoxelizedPhantom.cc.",
+  "properties": {
+    "ENABLE": { "type": "boolean", "default": false, "markdownDescription": "En: Enable the DICOM voxel phantom.\nRu: Включить воксельный фантом из DICOM.\nDefault: `false`." },
+    "CT_DIR": { "type": "string", "default": "", "markdownDescription": "En: Directory with CT DICOM slices.\nRu: Папка со срезами CT (DICOM)." },
+    "RTSTRUCT_FILE": { "type": "string", "default": "", "markdownDescription": "En: RTSTRUCT file (organ contours).\nRu: Файл RTSTRUCT (контуры органов)." },
+    "RTPLAN_FILE": { "type": "string", "default": "", "markdownDescription": "En: RTPLAN file (treatment beams).\nRu: Файл RTPLAN (пучки лечения)." },
+    "RTDOSE_FILE": { "type": "string", "default": "", "markdownDescription": "En: RTDOSE file (reference dose grid).\nRu: Файл RTDOSE (сетка референсной дозы)." },
+    "AXES": { "type": "string", "enum": ["LPS", "RAS"], "default": "LPS", "markdownDescription": "En: Patient coordinate convention.\n  `LPS` — DICOM frame directly (default).\n  `RAS` — flip X (Left→Right) and Y (Posterior→Anterior).\nRu: Система координат пациента.\n  `LPS` — кадр DICOM напрямую (по умолчанию).\n  `RAS` — переворот X (лево→право) и Y (зад→перед).\nDefault: `LPS`." },
+    "STRICT_TILT": { "type": "boolean", "default": false, "markdownDescription": "En: Treat gantry tilt as an error (instead of warning).\nRu: Считать наклон гантри ошибкой (вместо предупреждения).\nDefault: `false`." },
+    "RESAMPLE_TILT": { "type": "boolean", "default": true, "markdownDescription": "En: Resample tilted CT onto an axis-aligned grid.\nRu: Ресемплировать наклонное CT на осевую сетку.\nDefault: `true`." },
+    "IS_SENSITIVE": { "type": "boolean", "default": false, "markdownDescription": "En: Record energy deposition in phantom voxels (voxel copy number is stored in hits).\nRu: Записывать энерговыделение в вокселях фантома (номер вокселя сохраняется в хитах).\nDefault: `false`." },
+    "HU_TABLE": { "type": "string", "default": "", "markdownDescription": "En: (planned) Path to a HU → material calibration table.\nRu: (планируется) Путь к таблице калибровки HU → материал." },
+    "DOWNSAMPLE": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "default": [1, 1, 1], "markdownDescription": "En: (planned) Voxel binning factor [x, y, z].\nRu: (планируется) Коэффициент укрупнения вокселей [x, y, z].\nDefault: `[1, 1, 1]`." },
+    "ROIS": { "type": "array", "items": { "type": "string" }, "markdownDescription": "En: (planned) Organ ROI names to score.\nRu: (планируется) Имена органов для скоринга." },
+    "AGGREGATE": { "type": "array", "markdownDescription": "En: (planned) Group organs into zones, e.g. `- { name: Chest, members: [Lung_L, Lung_R, Heart] }`.\nRu: (планируется) Объединение органов в зоны, напр. `- { name: Chest, members: [Lung_L, Lung_R, Heart] }`." }
+  }
+}
