@@ -75,25 +75,13 @@
 #include "G4LogicalVolumeStore.hh"
 #include "G4EmDNAPhysicsActivator.hh"
 
-#ifdef __linux__
-#include <dlfcn.h>
-#elif _WIN32
-#include <windows.h>
-#endif
+#include "SharedLibrary.hh"
 
 PhysicsManager::PhysicsManager() {
     ReadConfiguration();
 }
 
-PhysicsManager::~PhysicsManager() {
-    for (void* handle : fLibraryHandles) {
-#ifdef __linux__
-        
-#elif _WIN32
-        FreeLibrary((HMODULE)handle);
-#endif
-    }
-}
+PhysicsManager::~PhysicsManager() = default;  // handles are intentionally kept alive (leaked)
 
 void PhysicsManager::ReadConfiguration() {
     auto* cfg = ConfigManager::Instance();
@@ -193,38 +181,30 @@ G4VPhysicsConstructor* PhysicsManager::LoadCustomConstructor(const G4String& lib
         return nullptr;
     }
 
-#ifdef __linux__
-    void* handle = dlopen(libPath.c_str(), RTLD_LAZY);
-    if (!handle) {
-        G4cerr << "PhysicsManager: Failed to load library: " << libPath << " : " << dlerror() << G4endl;
+    auto* lib = new SharedLibrary();
+    if (!lib->Open(libPath)) {
+        delete lib;
         return nullptr;
     }
 
-    std::string funcName = "create" + ctorName;
+    const std::string funcName = "create" + ctorName;
     typedef G4VPhysicsConstructor* (*CreateConstructor_t)();
-    CreateConstructor_t create = (CreateConstructor_t)dlsym(handle, funcName.c_str());
+    auto create = reinterpret_cast<CreateConstructor_t>(lib->Symbol(funcName));
     if (!create) {
         G4cerr << "PhysicsManager: Symbol " << funcName << " not found in library " << libPath << G4endl;
-        dlclose(handle);
+        delete lib;
         return nullptr;
     }
 
     G4VPhysicsConstructor* ctor = create();
     if (!ctor) {
         G4cerr << "PhysicsManager: Constructor creation failed for " << ctorName << G4endl;
-        dlclose(handle);
+        delete lib;
         return nullptr;
     }
 
-    fLibraryHandles.push_back(handle);
+    fLibraryHandles.push_back(lib);  // kept alive for the whole program
     return ctor;
-#elif _WIN32
-    G4cerr << "PhysicsManager: Dynamic library loading on Windows not yet implemented." << G4endl;
-    return nullptr;
-#else
-    G4cerr << "PhysicsManager: Unsupported platform for dynamic libraries." << G4endl;
-    return nullptr;
-#endif
 }
 
 /// @brief Load a full physics list (G4VModularPhysicsList*) from a shared library.
@@ -236,32 +216,31 @@ G4VModularPhysicsList* PhysicsManager::LoadCustomPhysicsList(const G4String& lib
         G4cerr << "PhysicsManager::LoadCustomPhysicsList: LIBRARY and CONSTRUCTOR required." << G4endl;
         return nullptr;
     }
-#ifdef __linux__
-    void* handle = dlopen(libPath.c_str(), RTLD_LAZY);
-    if (!handle) {
-        G4cerr << "PhysicsManager::LoadCustomPhysicsList: dlopen failed: " << dlerror() << G4endl;
+
+    auto* lib = new SharedLibrary();
+    if (!lib->Open(libPath)) {
+        delete lib;
         return nullptr;
     }
-    std::string funcName = "create" + ctorName;
+
+    const std::string funcName = "create" + ctorName;
     typedef G4VModularPhysicsList* (*CreateList_t)();
-    CreateList_t create = (CreateList_t)dlsym(handle, funcName.c_str());
+    auto create = reinterpret_cast<CreateList_t>(lib->Symbol(funcName));
     if (!create) {
         G4cerr << "PhysicsManager::LoadCustomPhysicsList: symbol " << funcName << " not found." << G4endl;
-        dlclose(handle);
+        delete lib;
         return nullptr;
     }
+
     G4VModularPhysicsList* pl = create();
     if (!pl) {
         G4cerr << "PhysicsManager::LoadCustomPhysicsList: constructor returned null." << G4endl;
-        dlclose(handle);
+        delete lib;
         return nullptr;
     }
-    fLibraryHandles.push_back(handle);
+
+    fLibraryHandles.push_back(lib);  // kept alive for the whole program
     return pl;
-#else
-    G4cerr << "PhysicsManager::LoadCustomPhysicsList: Only Linux supported for custom .so." << G4endl;
-    return nullptr;
-#endif
 }
 
 void PhysicsManager::ProcessModule(const ModuleInfo& module, G4VModularPhysicsList* physList) {

@@ -66,6 +66,7 @@
 #include "AdaptiveScoringManager.hh"
 #include "G4PhysicalVolumeStore.hh"
 #include "G4RunManager.hh"
+#include "G4GeometryManager.hh"
 #include "G4Threading.hh"
 #include "FieldManager.hh"
 #include "BeamAnalysis.hh"
@@ -77,6 +78,8 @@
 #include <cctype>
 #include <exception>
 #include <memory>
+#include <set>
+#include <cstdio>
 
 /// @brief Trim leading and trailing whitespace from a string.
 /// @param s Input string.
@@ -236,9 +239,60 @@ GeometryManager::GeometryManager()
 
 GeometryManager::~GeometryManager() = default;
 
+/// @brief Load custom geometry from a shared library if GEOMETRY.LIBRARY and
+///        GEOMETRY.CONSTRUCTOR are configured. Called once from main().
+void GeometryManager::LoadCustomGeometryFromConfig() {
+    auto* cfg = ConfigManager::Instance();
+    const G4String lib  = cfg->GetString("GEOMETRY.LIBRARY", "");
+    const G4String ctor = cfg->GetString("GEOMETRY.CONSTRUCTOR", "");
+    if (lib.empty() || ctor.empty()) return;
+
+    fCustomDetector = LoadCustomGeometry(lib, ctor);
+    if (fCustomDetector) {
+        G4cout << "[GeometryManager] Custom geometry loaded from " << lib
+               << " (constructor '" << ctor << "')" << G4endl;
+    }
+}
+
 /// @return The DICOM voxel phantom container LV (nullptr if not built).
 G4LogicalVolume* GeometryManager::GetDicomPhantomLV() const {
     return fDicomPhantom ? fDicomPhantom->GetContainerLV() : nullptr;
+}
+
+/// @brief Load a custom G4VUserDetectorConstruction from a shared library.
+/// @param libPath  Path to the .so file.
+/// @param ctorName Constructor name (used to build symbol "create<ctorName>").
+/// @return Pointer to the custom detector construction, or nullptr on failure.
+G4VUserDetectorConstruction* GeometryManager::LoadCustomGeometry(const G4String& libPath,
+                                                                 const G4String& ctorName) {
+    if (libPath.empty() || ctorName.empty()) {
+        G4cerr << "[GeometryManager] GEOMETRY.LIBRARY and GEOMETRY.CONSTRUCTOR must be set together."
+               << G4endl;
+        return nullptr;
+    }
+
+    fCustomGeomLib = std::make_unique<SharedLibrary>();
+    if (!fCustomGeomLib->Open(libPath)) {
+        fCustomGeomLib.reset();
+        return nullptr;
+    }
+
+    const std::string symbol = "create" + ctorName;
+    using CreateGeom_t = G4VUserDetectorConstruction* (*)();
+    auto create = reinterpret_cast<CreateGeom_t>(fCustomGeomLib->Symbol(symbol));
+    if (!create) {
+        G4cerr << "[GeometryManager] symbol '" << symbol << "' not found in " << libPath << G4endl;
+        fCustomGeomLib.reset();
+        return nullptr;
+    }
+
+    G4VUserDetectorConstruction* det = create();
+    if (!det) {
+        G4cerr << "[GeometryManager] '" << symbol << "' returned null." << G4endl;
+        fCustomGeomLib.reset();
+        return nullptr;
+    }
+    return det;
 }
 
 /// @brief Build the world volume, target box and place OBJECT objects.
@@ -253,6 +307,12 @@ G4LogicalVolume* GeometryManager::GetDicomPhantomLV() const {
 ///
 /// @return World physical volume pointer.
 G4VPhysicalVolume* GeometryManager::Construct() {
+
+    // ── Custom geometry from a shared library ──
+    if (fCustomDetector) {
+        fWorldPV = fCustomDetector->Construct();
+        return fWorldPV;
+    }
 
     // ---- Weight Window parallel world ----
     bool wwEnabled = ConfigManager::Instance()->GetBool("PHYSICS.ADVANCED.WEIGHT_WINDOW.ENABLE", false);
@@ -542,6 +602,12 @@ G4VPhysicalVolume* GeometryManager::Construct() {
 /// @brief Register SensitiveDetectors (MT-safe via Geant4 cloning).
 ///        Creates DigitizerModule after all SDs are registered.
 void GeometryManager::ConstructSDandField() {
+    // ── Custom geometry from a shared library ──
+    if (fCustomDetector) {
+        fCustomDetector->ConstructSDandField();
+        return;
+    }
+
     G4SDManager* sdManager = G4SDManager::GetSDMpointer();
     auto* detReg = fDetectorRegistry.get();
 
@@ -654,6 +720,117 @@ void GeometryManager::ConstructSDandField() {
         G4cout << "[GeometryManager] AdaptiveScoring initialized in ConstructSDandField()"
                << " threadID=" << G4Threading::G4GetThreadId() << G4endl;
     }
+}
+
+/// @brief Export geometry to GDML according to GEOMETRY.EXPORT.* configuration.
+///
+/// Supported modes:
+///   - scene  : write the whole world volume.
+///   - single : write one volume (GEOMETRY.EXPORT.VOLUME).
+///   - array  : write several volumes — explicit (GEOMETRY.EXPORT.OBJECTS)
+///              or logical (GEOMETRY.EXPORT.EXCLUDE_WORLD: all volumes except
+///              those named World/Hall).
+///
+/// scene and single are written directly; array exports are wrapped in a
+/// temporary world volume (headless only) so they form a valid GDML scene.
+void GeometryManager::ExportGdml() {
+    auto* cfg = ConfigManager::Instance();
+    if (!cfg->GetBool("GEOMETRY.EXPORT.ENABLE", false)) return;
+
+    const std::string outFile   = cfg->GetString("GEOMETRY.EXPORT.FILE", "export.gdml");
+    const std::string mode      = cfg->GetString("GEOMETRY.EXPORT.MODE", "scene");
+    const std::string singleVol = cfg->GetString("GEOMETRY.EXPORT.VOLUME", "");
+    const bool excludeWorld     = cfg->GetBool("GEOMETRY.EXPORT.EXCLUDE_WORLD", false);
+
+    // G4GDMLParser::Write() refuses to overwrite an existing file, so remove it first.
+    std::remove(outFile.c_str());
+
+    G4GDMLParser writer;
+
+    // ── Scene: write the whole world directly ──
+    if (mode == "scene") {
+        if (!fWorldPV) {
+            G4cerr << "[GeometryManager] GDML export: no world volume available." << G4endl;
+            return;
+        }
+        writer.Write(outFile, fWorldPV);
+        G4cout << "[GeometryManager] GDML scene exported to " << outFile << G4endl;
+        return;
+    }
+
+    // ── Single: write one logical volume directly (no temporary world) ──
+    if (mode == "single") {
+        G4LogicalVolume* lv = FindLogicalVolume(singleVol);
+        if (!lv) {
+            G4cerr << "[GeometryManager] GDML export: volume '" << singleVol
+                   << "' not found." << G4endl;
+            return;
+        }
+        writer.Write(outFile, lv);
+        G4cout << "[GeometryManager] GDML single volume exported to " << outFile << G4endl;
+        return;
+    }
+
+    // ── Array: collect logical volumes to export ──
+    std::vector<G4LogicalVolume*> selected;
+    if (mode == "array") {
+        if (excludeWorld) {
+            G4LogicalVolumeStore* store = G4LogicalVolumeStore::GetInstance();
+            for (auto* lv : *store) {
+                if (!lv) continue;
+                const G4String n = lv->GetName();
+                if (n.find("World") != std::string::npos ||
+                    n.find("Hall")  != std::string::npos) continue;
+                selected.push_back(lv);
+            }
+        } else {
+            for (const auto& name : cfg->GetStringVector("GEOMETRY.EXPORT.OBJECTS")) {
+                if (G4LogicalVolume* lv = FindLogicalVolume(name)) {
+                    selected.push_back(lv);
+                } else {
+                    G4cerr << "[GeometryManager] GDML export: volume '" << name
+                           << "' not found, skipped." << G4endl;
+                }
+            }
+        }
+    } else {
+        G4cerr << "[GeometryManager] GDML export: unknown MODE '" << mode
+               << "' (expected scene|single|array)." << G4endl;
+        return;
+    }
+
+    // Deduplicate (a volume listed twice is exported once).
+    std::vector<G4LogicalVolume*> unique;
+    std::set<G4LogicalVolume*> seen;
+    for (auto* lv : selected) {
+        if (lv && seen.insert(lv).second) unique.push_back(lv);
+    }
+    if (unique.empty()) {
+        G4cerr << "[GeometryManager] GDML export: no volumes selected." << G4endl;
+        return;
+    }
+
+    // ── Wrap the selection in a temporary world to form a valid GDML scene ──
+    G4GeometryManager::GetInstance()->OpenGeometry();
+
+    G4NistManager* nist = G4NistManager::Instance();
+    G4Material* air = nist->FindOrBuildMaterial("G4_AIR");
+    G4VSolid* box = new G4Box("G4CARE_ExportWorldBox", 5*m, 5*m, 5*m);
+    G4LogicalVolume* worldLV = new G4LogicalVolume(box, air, "G4CARE_ExportWorld");
+    G4VPhysicalVolume* worldPV = new G4PVPlacement(nullptr, G4ThreeVector(), worldLV,
+                                                   "G4CARE_ExportWorld", nullptr, false, 0);
+    int copyNo = 0;
+    for (auto* lv : unique) {
+        new G4PVPlacement(nullptr, G4ThreeVector(), lv,
+                          lv->GetName() + "_export", worldLV, false, copyNo++);
+    }
+
+    writer.Write(outFile, worldPV);
+
+    G4GeometryManager::GetInstance()->CloseGeometry();
+
+    G4cout << "[GeometryManager] GDML export (" << unique.size()
+           << " volume(s)) written to " << outFile << G4endl;
 }
 
 /// @brief Move the target box to a new position.

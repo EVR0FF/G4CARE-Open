@@ -45,6 +45,11 @@ public:
     /// @brief Get the loaded config file name
     const std::string& GetConfigFileName() const { return fConfigFileName; }
 
+    /// @brief Load a YAML config file and resolve INCLUDE directives (deep merge).
+    /// @param filename Path to the YAML file (may contain INCLUDE blocks).
+    /// @return Merged YAML root node (empty node on failure).
+    YAML::Node LoadConfigFile(const std::string& filename) const;
+
     /// @name Runtime context
     /// @{
     /// @brief Set context variables for expression evaluation (run ID, stage name)

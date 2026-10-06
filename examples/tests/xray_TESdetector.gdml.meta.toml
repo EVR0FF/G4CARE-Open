@@ -1,0 +1,16 @@
+# Metadata for xray_TESdetector.gdml (cloud preview).
+
+doi         = ""
+info_url    = ""
+description = "TES X-ray detector geometry (Geant4 GDML scene)."
+version     = "0.9.0"
+created     = "2026-09-30"
+tags        = ["gdml", "detector", "xray", "tes"]
+
+[author]
+name  = "G4CARE Developers"
+alias = "g4care-dev"
+
+[affiliation]
+group     = "G4CARE"
+institute = "TPU"

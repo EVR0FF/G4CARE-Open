@@ -1,0 +1,7 @@
+# ── Блок PHYSICS ──
+PHYSICS:
+  BASIC:
+    LIST: "QGSP_BERT_EMV"
+  ADVANCED:
+    STEPLIMITER:
+      ENABLE: true

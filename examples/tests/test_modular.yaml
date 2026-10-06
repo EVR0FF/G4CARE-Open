@@ -1,0 +1,9 @@
+# ── Модульный конфиг: блоки разнесены по файлам через INCLUDE ──
+INCLUDE:
+  - modular/geometry.yaml
+  - modular/source.yaml
+  - modular/physics.yaml
+
+EVENTS: 10
+VISUALIZATION: false
+SOURCE_MODE: "flow"

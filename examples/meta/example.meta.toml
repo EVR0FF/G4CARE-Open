@@ -1,0 +1,32 @@
+# ==============================================================================
+# G4CARE cloud metadata (TOML)
+#
+# This file is a METADATA sidecar, NOT a simulation configuration (.yaml).
+# Naming convention: <artifact>.meta.toml  (e.g. "scene.gdml.meta.toml").
+#
+# All fields are optional. Field meanings:
+#   doi           — DOI of the related article.
+#   info_url      — link to a file with full information (rendered for preview).
+#   description   — human-readable description.
+#   version       — artifact version.
+#   created       — creation date (ISO-8601).
+#   tags          — search tags.
+#   [author]      — name (ФИО) and alias (псевдоним).
+#   [affiliation] — group, institute, optional department.
+# ==============================================================================
+
+doi         = "10.5281/zenodo.1234567"
+info_url    = "https://example.org/articles/detector"
+description = "Silicon detector for nano-target radiation transport."
+version     = "0.9.0"
+created     = "2026-09-30"
+tags        = ["detector", "nano", "niel"]
+
+[author]
+name  = "G4CARE Developers"
+alias = "g4care-dev"
+
+[affiliation]
+group      = "G4CARE"
+institute  = "TPU"
+department = "Laboratory 42"

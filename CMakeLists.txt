@@ -26,6 +26,9 @@ set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 add_subdirectory(${PROJECT_SOURCE_DIR}/third_party/yaml-cpp)
 include_directories(${PROJECT_SOURCE_DIR}/third_party/yaml-cpp/include)
 
+# toml++ (header-only, MIT) — cloud metadata files (*.meta.toml)
+include_directories(${PROJECT_SOURCE_DIR}/third_party/toml++/include)
+
 include(${Geant4_USE_FILE})
 
 file(GLOB_RECURSE INCLUDE_DIRS LIST_DIRECTORIES true ${PROJECT_SOURCE_DIR}/include/*)

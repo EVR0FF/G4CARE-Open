@@ -1,0 +1,111 @@
+# G4CARE cloud — local development / self-hosted deployment.
+#
+# Production path: the backend uses S3 (SeaweedFS) for object storage and
+# PostgreSQL for the metadata index + user store. See README.md "Production-путь".
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      G4CARE_CLOUD_HOST: 0.0.0.0
+      G4CARE_CLOUD_PORT: 3000
+      G4CARE_CLOUD_JWT_SECRET: ${G4CARE_CLOUD_JWT_SECRET:-change-me-in-production}
+      # S3 object storage (SeaweedFS)
+      G4CARE_CLOUD_S3_ENDPOINT: seaweedfs
+      G4CARE_CLOUD_S3_PORT: "9000"
+      G4CARE_CLOUD_S3_USESSL: "false"
+      G4CARE_CLOUD_S3_ACCESS_KEY: ${G4CARE_CLOUD_S3_ACCESS_KEY:-g4care}
+      G4CARE_CLOUD_S3_SECRET_KEY: ${G4CARE_CLOUD_S3_SECRET_KEY:-g4care-secret}
+      G4CARE_CLOUD_S3_BUCKET: ${G4CARE_CLOUD_S3_BUCKET:-g4care}
+      # PostgreSQL metadata index + user store
+      G4CARE_CLOUD_DB_URL: postgres://g4care:${POSTGRES_PASSWORD:-g4care}@postgres:5432/g4care
+      # Email (SMTP) for verification codes — leave SMTP_HOST empty to log codes instead
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-noreply@g4care.cloud}
+      # G4CARE_GDML2OBJ: /opt/gdml2obj   # optional: built separately (needs Geant4)
+      # 3D preview: GDML -> OBJ converter microservice (see converter/).
+      G4CARE_CONVERTER_URL: http://converter:8081
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: g4care
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-g4care}
+      POSTGRES_DB: g4care
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U g4care -d g4care"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.48
+    command: server -s3 -s3.port=9000 -s3.config=/etc/seaweedfs/s3.json -dir=/data -volume.max=64
+    volumes:
+      - seaweeddata:/data
+      - ./seaweedfs-s3.json:/etc/seaweedfs/s3.json:ro
+    ports:
+      - "9000:9000"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9333/cluster/status"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  # GDML -> OBJ converter (Geant4). Build via converter/ (run converter/stage.sh first).
+  converter:
+    build:
+      context: ./converter
+      dockerfile: Dockerfile
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    depends_on:
+      - backend
+
+  # Anubis — anti-bot proof-of-work challenge in front of the web UI.
+  anubis:
+    build:
+      context: .
+      dockerfile: anubis.Dockerfile
+    command: ["-bind=:8080", "-target=http://frontend:80", "-serve-robots-txt", "-use-remote-address"]
+    ports:
+      - "8080:8080"
+    depends_on:
+      - frontend
+
+volumes:
+  pgdata:
+  seaweeddata:

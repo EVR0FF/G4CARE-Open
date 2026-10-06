@@ -1,0 +1,8 @@
+.env
+seaweedfs-s3.json
+node_modules/
+data/
+dist/
+*.log
+converter/gdml2obj
+converter/stage/

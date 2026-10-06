@@ -1,0 +1,19 @@
+# ── Тест: пользовательская геометрия из .so ──
+EVENTS: 1
+VISUALIZATION: false
+
+GEOMETRY:
+  LIBRARY: "/tmp/libExampleGeometry.so"
+  CONSTRUCTOR: "ExampleGeometry"
+
+SOURCE:
+  gun:
+    type: "particleGun"
+    particle: "e-"
+    energy: "1*MeV"
+    direction: { x: 0, y: 0, z: 1 }
+    pos: { x: 0, y: 0, z: "-20*cm" }
+
+PHYSICS:
+  BASIC:
+    LIST: "QGSP_BERT_EMV"

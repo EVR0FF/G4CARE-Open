@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloud
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install
+        run: npm install
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test
+        run: npm test
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloud/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install
+        run: npm install
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test
+        run: npm test
+      - name: Build
+        run: npm run build
+
+  integration:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloud
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: g4care
+          POSTGRES_PASSWORD: g4care
+          POSTGRES_DB: g4care
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U g4care"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install
+        run: npm install
+      - name: Start SeaweedFS (S3)
+        run: |
+          docker run -d --name seaweedfs -p 8333:8333 chrislusf/seaweedfs:4.48 server -s3 -dir=/data
+          for i in $(seq 1 30); do
+            (echo > /dev/tcp/127.0.0.1/8333) 2>/dev/null && break
+            sleep 1
+          done
+      - name: Integration tests
+        run: npm run test:integration

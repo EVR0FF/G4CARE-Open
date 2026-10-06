@@ -23,6 +23,103 @@
 #include <algorithm>
 #include <cctype>
 #include <sstream>
+#include <cstdlib>
+#include <set>
+
+// ======================================================================
+//  Modular configuration: INCLUDE resolution and deep merge (file-local)
+// ======================================================================
+namespace {
+
+/// @brief Extract the directory part of a path.
+std::string DirName(const std::string& path) {
+    const std::size_t pos = path.find_last_of("/\\");
+    if (pos == std::string::npos) return ".";
+    if (pos == 0) return "/";
+    return path.substr(0, pos);
+}
+
+/// @brief Join a base directory and a (possibly relative) path.
+std::string JoinPath(const std::string& dir, const std::string& rel) {
+    if (rel.empty()) return dir;
+    if (rel[0] == '/' || (rel.size() > 1 && rel[1] == ':')) return rel; // absolute
+    if (dir.empty() || dir == ".") return rel;
+    return dir + "/" + rel;
+}
+
+/// @brief Canonicalize a path (used for cycle detection).
+std::string CanonicalPath(const std::string& path) {
+    char* resolved = realpath(path.c_str(), nullptr);
+    if (resolved) {
+        std::string s(resolved);
+        std::free(resolved);
+        return s;
+    }
+    return path;
+}
+
+/// @brief Deep-merge @p source into @p target (source wins on conflict).
+/// Maps are merged recursively; scalars and sequences are replaced.
+void DeepMerge(YAML::Node target, const YAML::Node source) {
+    if (!source.IsMap() || !target.IsMap()) return;
+    for (auto it = source.begin(); it != source.end(); ++it) {
+        const std::string key = it->first.as<std::string>();
+        const YAML::Node srcChild = it->second;
+        YAML::Node existing = target[key];
+        if (existing && existing.IsMap() && srcChild.IsMap()) {
+            DeepMerge(existing, srcChild);
+        } else {
+            target[key] = srcChild;
+        }
+    }
+}
+
+/// @brief Recursively resolve INCLUDE directives and deep-merge included files.
+YAML::Node ResolveIncludes(const std::string& filename, std::set<std::string>& active) {
+    const std::string absPath = CanonicalPath(filename);
+    if (active.count(absPath)) {
+        G4cerr << "ConfigManager: circular INCLUDE detected for '" << filename
+               << "'; skipping this include." << G4endl;
+        return YAML::Node(YAML::NodeType::Map);
+    }
+
+    YAML::Node root = YAML::LoadFile(filename);
+    active.insert(absPath);
+
+    const YAML::Node& constRoot = root;
+    const YAML::Node includeNode = constRoot["INCLUDE"];
+
+    if (!includeNode) {
+        active.erase(absPath);
+        return root;
+    }
+
+    std::vector<std::string> includes;
+    if (includeNode.IsScalar()) {
+        includes.push_back(includeNode.as<std::string>());
+    } else if (includeNode.IsSequence()) {
+        for (const auto& item : includeNode) {
+            if (item.IsScalar()) includes.push_back(item.as<std::string>());
+        }
+    }
+
+    const std::string dir = DirName(absPath);
+    YAML::Node merged(YAML::NodeType::Map);
+    for (const auto& inc : includes) {
+        const std::string incPath = JoinPath(dir, inc);
+        YAML::Node incRoot = ResolveIncludes(incPath, active);
+        DeepMerge(merged, incRoot);
+    }
+
+    // The including file's own keys take precedence over included files.
+    root.remove("INCLUDE");
+    DeepMerge(merged, root);
+
+    active.erase(absPath);
+    return merged;
+}
+
+} // anonymous namespace
 
 ConfigManager* ConfigManager::fInstance = nullptr;
 
@@ -81,6 +178,14 @@ ConfigManager::~ConfigManager() {}
 //  Configuration Loading
 // ======================================================================
 
+/// @brief Load a YAML config file and resolve INCLUDE directives (deep merge).
+/// @param filename Path to the YAML file (may contain INCLUDE blocks).
+/// @return Merged YAML root node.
+YAML::Node ConfigManager::LoadConfigFile(const std::string& filename) const {
+    std::set<std::string> active;
+    return ResolveIncludes(filename, active);
+}
+
 /// @brief Load and flatten a YAML configuration file
 ///
 /// Loads the YAML file, then flattens all data (scalars, vectors,
@@ -90,7 +195,7 @@ ConfigManager::~ConfigManager() {}
 /// @return true on success
 bool ConfigManager::LoadConfig(const std::string& filename) {
     try {
-        fRootNode = YAML::LoadFile(filename);
+        fRootNode = LoadConfigFile(filename);
         fConfigFileName = filename;
         fIsLoaded = false;
         fFlatScalars.clear();

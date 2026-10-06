@@ -42,6 +42,7 @@
 
 #include "G4VUserDetectorConstruction.hh"
 #include "G4GDMLParser.hh"
+#include "SharedLibrary.hh"
 #include "WeightWindowWorld.hh"
 #include "WeightWindowManager.hh"
 #include "DetectorRegistry.hh"
@@ -86,6 +87,16 @@ public:
     /// @brief Set an external GDML file to override default geometry.
     void SetGeometryFile(const G4String& filename) { fGeometryFile = filename; }
 
+    /// @brief Export geometry to GDML according to GEOMETRY.EXPORT.* config.
+    void ExportGdml();
+
+    /// @brief Load a custom G4VUserDetectorConstruction from a shared library.
+    G4VUserDetectorConstruction* LoadCustomGeometry(const G4String& libPath, const G4String& ctorName);
+
+    /// @brief Load custom geometry from a shared library if GEOMETRY.LIBRARY and
+    ///        GEOMETRY.CONSTRUCTOR are configured. Called once from main().
+    void LoadCustomGeometryFromConfig();
+
     /// @brief Move the target box to a new position.
     void MoveTarget(const G4ThreeVector& newPos);
     /// @brief Get the current target box position.
@@ -98,6 +109,8 @@ private:
     std::unique_ptr<ObjectManager> fObjectManager;       ///< Manages OBJECT block objects.
     std::unique_ptr<DetectorRegistry> fDetectorRegistry; ///< Registry for SensitiveDetectors.
     std::unique_ptr<VoxelizedPhantom> fDicomPhantom;     ///< DICOM voxel phantom (CT).
+    std::unique_ptr<SharedLibrary> fCustomGeomLib;       ///< Handle for a custom geometry .so.
+    G4VUserDetectorConstruction* fCustomDetector = nullptr; ///< Custom geometry from a .so.
     G4String fGeometryFile;                              ///< Optional GDML file path.
     std::string Trim(const std::string& s);               ///< String trim helper.
 };

@@ -67,7 +67,7 @@ int main(int argc, char** argv) {
     struct SeedEntry { std::vector<long> values; std::string condition; };
     std::vector<SeedEntry> seedEntries;
     try {
-        YAML::Node rawConfig = YAML::LoadFile(configPath);
+        YAML::Node rawConfig = cfg->LoadConfigFile(configPath);
 
         // MACROS
         YAML::Node macrosNode = rawConfig["MACROS"];
@@ -183,6 +183,7 @@ int main(int argc, char** argv) {
 #endif
 
     auto* geomManager = new GeometryManager();
+    geomManager->LoadCustomGeometryFromConfig();
     PhysicsManager physMgr;
     G4VModularPhysicsList* physicsList = physMgr.CreatePhysicsList();
 
@@ -376,6 +377,11 @@ int main(int argc, char** argv) {
     stageMgr.LoadConfiguration(configPath);
     ConvergenceValidator validator;
     stageMgr.RunAll();
+
+    // GDML export (GEOMETRY.EXPORT.*) — headless only, after the run.
+    if (!visualization) {
+        geomManager->ExportGdml();
+    }
 
     auto results = validator.CheckAllVoxels();
     if (!results.empty()) {

@@ -8,7 +8,7 @@ manager, geometry, physics lists and user actions, and writes analysis output
 via ROOT (`RDataFrame` / `RNTuple`). It supports multi-stage runs, scoring,
 macro execution and interactive visualisation.
 
-Version **v0.9.0** · License **Apache-2.0**
+Version **v0.9.2** · License **Apache-2.0**
 
 ## Features
 
@@ -66,6 +66,67 @@ Key top-level configuration keys: `EVENTS`, `NTHREADS`, `VISUALIZATION`,
 `MACROS`, `SEED`, `CHEMISTRY.*`, `PHYSICS.*`, `GEOMETRY_FILE`,
 `SENSITIVE_VOLUMES`, `OUTPUT_FILE`, `DECAY_TIME_THRESHOLD`.
 
+## Modular configuration (INCLUDE)
+
+A configuration can be split into multiple YAML files. The top-level `INCLUDE`
+key loads and deep-merges other files; the main file's own keys take precedence:
+
+```yaml
+INCLUDE:
+  - modular/geometry.yaml
+  - modular/source.yaml
+  - modular/physics.yaml
+
+EVENTS: 10
+VISUALIZATION: false
+```
+
+`INCLUDE` accepts either a single path or a list. Paths are resolved relative to
+the including file. The merge is **deep**: maps merge recursively, while scalars
+and sequences are replaced. Later includes override earlier ones, and the
+including file's own keys override everything. Circular includes are detected
+and skipped.
+
+See `examples/tests/test_modular.yaml` and `examples/tests/modular/`.
+
+## GDML export
+
+`GEOMETRY.EXPORT` saves the geometry to GDML after the run (headless):
+
+```yaml
+GEOMETRY:
+  EXPORT:
+    ENABLE: true
+    FILE: "export.gdml"
+    MODE: "scene"          # scene | single | array
+    # VOLUME: "Target"      # for single
+    # OBJECTS: ["A","B"]    # for array (explicit)
+    # EXCLUDE_WORLD: true   # for array (logical: all except World/Hall)
+```
+
+- `scene`  — whole world.
+- `single` — one volume (`VOLUME`).
+- `array`  — several volumes: explicit `OBJECTS` or logical `EXCLUDE_WORLD`.
+
+Subset exports are wrapped in a temporary world volume so they form a valid
+GDML scene. See `examples/tests/test_gdml_export.yaml` and
+`examples/tests/test_gdml_export_scene.yaml`.
+
+## Custom geometry (.so)
+
+`GEOMETRY.LIBRARY` + `GEOMETRY.CONSTRUCTOR` load a custom
+`G4VUserDetectorConstruction` from a shared library (exported as
+`create<CONSTRUCTOR>()`), replacing the built-in geometry construction:
+
+```yaml
+GEOMETRY:
+  LIBRARY: "libMyGeometry.so"
+  CONSTRUCTOR: "MyGeometry"
+```
+
+See `examples/geometry/ExampleGeometry.cc`. (Primarily for single-threaded /
+visualization use.)
+
 ## Examples
 
 Run-ready YAML configurations live in `examples/`:
@@ -93,6 +154,39 @@ examples/               YAML configs and reference models
 .vscode/schemas/        JSON-Schema for YAML autocompletion
 CMakeLists.txt          build script
 ```
+
+## Cloud metadata (TOML)
+
+Each cloud artifact (`.yaml`, `.gdml`, `.so`, `.mac`, …) may carry a metadata
+sidecar named `<artifact>.meta.toml` for preview in cloud UIs. The format is
+TOML — intentionally distinct from the YAML configuration so the two can never
+be confused:
+
+```toml
+doi         = "10.5281/zenodo.1234567"
+info_url    = "https://example.org/articles/detector"
+description = "Silicon detector ..."
+version     = "0.9.0"
+created     = "2026-09-30"
+tags        = ["detector", "nano", "niel"]
+
+[author]
+name  = "G4CARE Developers"
+alias = "g4care-dev"
+
+[affiliation]
+group     = "G4CARE"
+institute = "TPU"
+```
+
+All fields are optional: `doi`, `info_url`, `description`, `version`, `created`
+(ISO-8601 date), `tags` (list of strings), `[author]` (`name`, `alias`),
+`[affiliation]` (`group`, `institute`, `department`).
+
+The parser is `MetaReader` (`include/DataIO/MetaReader.hh`,
+`src/DataIO/MetaReader.cc`), backed by the header-only toml++ library vendored
+under `third_party/toml++/`. See `examples/meta/example.meta.toml` and
+`examples/tests/xray_TESdetector.gdml.meta.toml` for reference files.
 
 ## License
 

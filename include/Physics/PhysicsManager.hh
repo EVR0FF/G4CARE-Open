@@ -36,6 +36,7 @@
 #include "globals.hh"
 #include "ICrossSectionSource.hh"
 #include "UserCrossSectionModel.hh"
+#include "SharedLibrary.hh"
 #include <vector>
 #include <map>
 #include <string>
@@ -124,7 +125,7 @@ private:
     std::vector<ModuleInfo> fModules;
     std::vector<EmRegionInfo> fEmRegions;
 
-    std::vector<void*> fLibraryHandles;
+    std::vector<SharedLibrary*> fLibraryHandles; ///< Kept alive for the whole program (loaded objects may outlive this manager).
     std::vector<ICrossSectionSource*> fCrossSectionSources;
 };
 
