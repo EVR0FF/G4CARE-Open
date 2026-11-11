@@ -228,7 +228,7 @@ void ActivationSource::GeneratePrimaries(G4Event* event) {
     vertex->SetPrimary(particle);
     vertex->SetWeight(weight);
 
-    BeamAnalysis::Instance()->Fill("primary", UnifiedSource(vertex, particle));
+    BeamAnalysis::Instance()->Fill("primary", UnifiedSource(vertex, particle, fSourceName));
 
     event->AddPrimaryVertex(vertex);
 }

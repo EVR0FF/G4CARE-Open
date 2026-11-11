@@ -4,12 +4,11 @@
 // @brief   Extracts particle-related column values (PDG code, mass, charge,
 //          name, spin, parity, lifetimes, ion Z/A/excitation/isomer) from
 //          G4ParticleDefinition.
-// @details ParticleExtractor resolves particle properties either via
-//   TypedRegistries (PDG, mass, charge, particle name) or directly from the
+// @details ParticleExtractor resolves particle properties directly from the
 //   G4ParticleDefinition.  Ion-specific columns (Z, A, excitation energy,
 //   isomer level) are obtained from the UnifiedSource.
 //
-//   Configuration keys read: none (registry-driven).
+//   Configuration keys read: none.
 // @author  I. I. Everstov
 // @author  V. F. Myshkin (Scientific Supervisor)
 // @date    2026-07-15  @version 0.9.0
@@ -22,7 +21,7 @@
 #include "G4Ions.hh"
 
 /// @brief Extracts a numeric particle column value for the given source.
-/// @param type Column type (PDGCode, Mass, Charge, ParticleName-as-ID, Spin,
+/// @param type Column type (PDGCode, Mass, Charge, Spin,
 ///        Parity, Conjugation, Isospin, Isospin3, GParity, Lifetime, Width,
 ///        LeptonNumber, BaryonNumber, Z, A, Excitation, IsomerLevel).
 /// @param src  UnifiedSource providing G4ParticleDefinition.
@@ -33,22 +32,13 @@ double ParticleExtractor::Get(ColType type, const UnifiedSource& src) const {
 
     switch (type) {
         case ColType::PDGCode:
-            if (fPDGReg) return static_cast<double>(fPDGReg->GetID(def->GetPDGEncoding()));
             return static_cast<double>(def->GetPDGEncoding());
 
         case ColType::Mass:
-            if (fMassReg) return static_cast<double>(fMassReg->GetID(def->GetPDGMass()));
             return def->GetPDGMass() / MeV;
 
         case ColType::Charge:
-            if (fChargeReg) return static_cast<double>(fChargeReg->GetID(def->GetPDGCharge()));
             return def->GetPDGCharge();
-
-        case ColType::ParticleName:
-            if (fParticleNameReg) {
-                return static_cast<double>(fParticleNameReg->GetID(def->GetParticleName()));
-            }
-            return 0.0;
 
         case ColType::ParticleSpin:
             return static_cast<double>(def->GetPDGiSpin());

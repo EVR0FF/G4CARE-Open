@@ -12,10 +12,10 @@
 //      (CHEMISTRY.VOLUME) into a global atomic energy accumulator
 //      for dose monitoring via sAccumulatedEnergyJ / sWaterMassKg.
 //   2. Fills the "g4care" NTuple tree via BeamAnalysis::Fill().
-//   3. If EXPRS blocks are defined, builds FilterVars from the step
-//      data, accumulates per-volume statistics in ExprsManager,
+//   3. If SCRIPT.scripts are defined, builds FilterVars from the step
+//      data, accumulates per-volume statistics in ScriptsManager,
 //      and optionally executes step-level ExprTK scripts
-//      (ExprsManager::TryExecuteStepScripts).
+//      (ScriptsManager::TryExecuteStepScripts).
 //
 //   At event end, AccumulateEventEnergy() atomically transfers the
 //   per-event (thread-local) energy deposit to the global atomic
@@ -48,7 +48,8 @@
 #include "G4VPhysicalVolume.hh"
 #include "G4LogicalVolume.hh"
 #include "G4LogicalVolumeStore.hh"
-#include "ExprsManager.hh"
+#include "DoseScorer.hh"
+#include "ScriptsManager.hh"
 #include <set>
 
 std::atomic<double> SteppingAction::sAccumulatedEnergyJ{0.0};
@@ -60,6 +61,7 @@ std::atomic<bool>   SteppingAction::sEnabled{false};
 std::unordered_set<std::string> SteppingAction::sChemVolumeNames;
 bool                SteppingAction::sChemEnabled     = false;
 std::atomic<double> SteppingAction::sWaterMassKg{0.0};
+std::atomic<unsigned long long> SteppingAction::sStepCount{0};
 
 thread_local double g_tlEventEnergyJ = 0.0;
 thread_local std::set<const G4LogicalVolume*> g_tlEventVolumes;
@@ -78,14 +80,23 @@ SteppingAction::SteppingAction() {}
 ///    g_tlEventEnergyJ and accumulated in ChemistryExtractor for
 ///    G-value scoring.
 /// 2. **NTuple fill** — the step data is sent to BeamAnalysis::Fill("g4care").
-/// 3. **EXPRS accumulation** — if ExprsManager has active blocks,
+/// 3. **SCRIPT.scripts accumulation** — if ScriptsManager has active blocks,
 ///    FilterVars are built from the step, accumulated per logical
 ///    volume, and step-level ExprTK scripts are executed when the
 ///    step frequency condition is met.
 void SteppingAction::UserSteppingAction(const G4Step* step) {
     if (!step) return;
 
+    sStepCount.fetch_add(1, std::memory_order_relaxed);
     double edep = step->GetTotalEnergyDeposit();
+
+    // Voxel dose-grid scoring (RTDOSE): when the CT phantom voxel sensitive
+    // detector is active, edep is accumulated by exact voxel index inside
+    // SensitiveDetector::ProcessHits; otherwise fall back to position mapping.
+    if (edep > 0.0 && DoseScorer::Instance()->IsConfigured()
+        && !DoseScorer::Instance()->UsesVoxelIndex()) {
+        DoseScorer::Instance()->Deposit(step->GetPreStepPoint()->GetPosition(), edep);
+    }
 
     if ((sEnabled.load(std::memory_order_relaxed) || sChemEnabled) && edep > 0.0) {
         G4VPhysicalVolume* pv = step->GetPreStepPoint()->GetPhysicalVolume();
@@ -111,8 +122,8 @@ void SteppingAction::UserSteppingAction(const G4Step* step) {
     auto* beam = BeamAnalysis::Instance();
     beam->Fill("g4care", step);
 
-    // ── EXPRS accumulation: per-volume, independent of NTUPLES ──
-    auto* sm = ExprsManager::Instance();
+    // ── SCRIPT.scripts accumulation: per-volume, independent of NTUPLES ──
+    auto* sm = ScriptsManager::Instance();
     if (!sm->GetBlocks().empty()) {
         auto* pv = step->GetPreStepPoint()->GetPhysicalVolume();
         auto* lv = pv ? pv->GetLogicalVolume() : nullptr;
@@ -124,6 +135,10 @@ void SteppingAction::UserSteppingAction(const G4Step* step) {
                 de->BuildFilterVars(filterVars, src, -1, -1, -1, nullptr);
                 sm->Accumulate(lv, filterVars);
                 g_tlEventVolumes.insert(lv);
+                ScriptsManager::SetNameContext(
+                    step->GetTrack() ? step->GetTrack()->GetParticleDefinition()->GetParticleName() : "",
+                    (step->GetPostStepPoint() && step->GetPostStepPoint()->GetProcessDefinedStep())
+                        ? step->GetPostStepPoint()->GetProcessDefinedStep()->GetProcessName() : "");
                 sm->TryExecuteStepScripts(lv, filterVars);
                 if (edep > 0.0) g_tlHadInteraction = true;
             }

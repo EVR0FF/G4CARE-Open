@@ -90,7 +90,7 @@ ParticleGunSource::~ParticleGunSource() = default;
 /// All numeric fields are compiled as ExprTK expressions stored in
 /// FastExpr structs for low-latency evaluation during event generation.
 /// User variables from SOURCE.<name>.variables are exported as
-/// runtime variables accessible in EXPRS scripts.
+/// runtime variables accessible in SCRIPT.scripts.
 ///
 /// @see ParticleGunSource::GeneratePrimaries
 void ParticleGunSource::ParseConfig() {
@@ -98,26 +98,7 @@ void ParticleGunSource::ParseConfig() {
 
     G4cout << "ParticleGunSource::ParseConfig - Source: '" << fSourceName << "'" << G4endl;
 
-    std::string varPath = fSourceName + ".variables";
-    auto varKeys = cfg->GetSectionKeys(varPath);
-
     std::vector<std::string> allVarNames = {"event_id", "v_i", "p_i"};
-    for (const auto& key : varKeys) {
-        
-        allVarNames.push_back(key);
-    }
-
-    for (const auto& key : varKeys) {
-        std::string raw = cfg->GetString(varPath + "." + key, "");
-        VarExpr ve;
-        ve.name = key;
-        ve.expr = ExpressionEvaluator::PrecompiledExpr(raw, allVarNames, fEval.get());
-        ve.fast.Init(ve.expr);
-        fVars.push_back(std::move(ve));
-        
-        G4cout << "ParticleGunSource::ParseConfig - Variable '" << key 
-               << "' = '" << raw << "'" << G4endl;
-    }
 
     std::string modeStr = cfg->GetString(fSourceName + ".vertex_mode", "sequential");
     if (modeStr == "random") {
@@ -152,6 +133,8 @@ void ParticleGunSource::ParseConfig() {
             cfg->GetString(fSourceName + ".pos.y", "0"), allVarNames, fEval.get());
         vtx.posZExpr = ExpressionEvaluator::PrecompiledExpr(
             cfg->GetString(fSourceName + ".pos.z", "0"), allVarNames, fEval.get());
+        vtx.vertexRadius = cfg->GetValueWithUnits(fSourceName + ".vertex_radius", 0.0);
+        vtx.hemisphere = cfg->GetBool(fSourceName + ".hemisphere", false);
         vtx.timeExpr = ExpressionEvaluator::PrecompiledExpr(
             cfg->GetString(fSourceName + ".time", "0"), allVarNames, fEval.get());
         vtx.weightExpr = ExpressionEvaluator::PrecompiledExpr(
@@ -181,6 +164,10 @@ void ParticleGunSource::ParseConfig() {
                 cfg->GetString(fSourceName + ".direction.y", "0"), allVarNames, fEval.get());
             pd.dirZExpr = ExpressionEvaluator::PrecompiledExpr(
                 cfg->GetString(fSourceName + ".direction.z", "1"), allVarNames, fEval.get());
+            pd.dirMode = cfg->GetString(fSourceName + ".direction_mode", "");
+            pd.coneAngle = cfg->GetValueWithUnits(fSourceName + ".cone_angle", 0.0) / CLHEP::rad;
+            pd.sigmaTheta = cfg->GetValueWithUnits(fSourceName + ".sigma_theta", 0.0) / CLHEP::rad;
+            pd.sigmaPhi = cfg->GetValueWithUnits(fSourceName + ".sigma_phi", 0.0) / CLHEP::rad;
             pd.weightExpr = ExpressionEvaluator::PrecompiledExpr(
                 cfg->GetString(fSourceName + ".weight", "1.0"), allVarNames, fEval.get());
             vtx.particles.push_back(std::move(pd));
@@ -323,7 +310,7 @@ bool ParticleGunSource::CreateVertexGenerator(const std::string& type) {
 /// **Processing order:**
 /// 1. Evaluate all user variables (SOURCE.<name>.variables.*) and
 ///    export them via ConfigManager::SetRuntime so they are visible in
-///    EXPRS scripts (EXPRS ↔ SOURCE feedback loop).
+///    SCRIPT.scripts (SCRIPT.scripts ↔ SOURCE feedback loop).
 /// 2. If a data_alias table is active and the current event index exceeds
 ///    the number of rows, abort the run via G4RunManager::AbortRun().
 /// 3. **Vertex-generator path** — if fVertexGenerator is active,
@@ -351,12 +338,6 @@ bool ParticleGunSource::CreateVertexGenerator(const std::string& type) {
 void ParticleGunSource::GeneratePrimaries(G4Event* event) {
     double current_event_id = event->GetEventID();
 
-    // Export user variables to runtime vars (for EXPRS ↔ SOURCE)
-    for (const auto& v : fVars) {
-        double val = v.fast.Evaluate(current_event_id, 0.0, 0.0);
-        ConfigManager::SetRuntime(v.name, val);
-    }
-
      if (fCheckDataRows && current_event_id >= fDataRows) {
         G4RunManager::GetRunManager()->AbortRun();
         return;
@@ -369,7 +350,7 @@ void ParticleGunSource::GeneratePrimaries(G4Event* event) {
             for (auto* v : vertices) {
                 G4PrimaryParticle* lastParticle = (v->GetNumberOfParticle() > 0) 
                     ? v->GetPrimary(0) : nullptr;
-                BeamAnalysis::Instance()->Fill("primary", UnifiedSource(v, lastParticle));
+                BeamAnalysis::Instance()->Fill("primary", UnifiedSource(v, lastParticle, fSourceName));
                 event->AddPrimaryVertex(v);
             }
         } else {
@@ -385,7 +366,7 @@ void ParticleGunSource::GeneratePrimaries(G4Event* event) {
                     if (r <= cum) {
                         G4PrimaryParticle* lastParticle = (vertices[i]->GetNumberOfParticle() > 0)
                             ? vertices[i]->GetPrimary(0) : nullptr;
-                        BeamAnalysis::Instance()->Fill("primary", UnifiedSource(vertices[i], lastParticle));
+                        BeamAnalysis::Instance()->Fill("primary", UnifiedSource(vertices[i], lastParticle, fSourceName));
                         event->AddPrimaryVertex(vertices[i]);
                         break;
                     }
@@ -424,6 +405,15 @@ void ParticleGunSource::GeneratePrimaries(G4Event* event) {
             double x = vtx.fastPosX.Evaluate(current_event_id, v_i, 0.0);
             double y = vtx.fastPosY.Evaluate(current_event_id, v_i, 0.0);
             double z = vtx.fastPosZ.Evaluate(current_event_id, v_i, 0.0);
+            if (vtx.hemisphere && vtx.vertexRadius > 0.0) {
+                double u1 = G4UniformRand();
+                double u2 = G4UniformRand();
+                double r = vtx.vertexRadius * std::sqrt(u1);
+                double phi = 2.0 * M_PI * u2;
+                x = r * std::cos(phi);
+                y = r * std::sin(phi);
+                z = vtx.vertexRadius * std::sqrt(1.0 - u1);
+            }
             double time = vtx.fastTime.Evaluate(current_event_id, v_i, 0.0);
             double vtxWeight = vtx.fastWeight.Evaluate(current_event_id, v_i, 0.0);
             if (vtxWeight <= 0.0) continue;
@@ -450,7 +440,7 @@ void ParticleGunSource::GeneratePrimaries(G4Event* event) {
             }
 
             if (vertex->GetNumberOfParticle() > 0) {
-                BeamAnalysis::Instance()->Fill("primary", UnifiedSource(vertex, lastParticle));
+                BeamAnalysis::Instance()->Fill("primary", UnifiedSource(vertex, lastParticle, fSourceName));
                 event->AddPrimaryVertex(vertex);
             } else {
                 delete vertex;
@@ -473,6 +463,15 @@ void ParticleGunSource::GeneratePrimaries(G4Event* event) {
         double x = vtx.fastPosX.Evaluate(current_event_id, v_i, 0.0);
         double y = vtx.fastPosY.Evaluate(current_event_id, v_i, 0.0);
         double z = vtx.fastPosZ.Evaluate(current_event_id, v_i, 0.0);
+        if (vtx.hemisphere && vtx.vertexRadius > 0.0) {
+            double u1 = G4UniformRand();
+            double u2 = G4UniformRand();
+            double r = vtx.vertexRadius * std::sqrt(u1);
+            double phi = 2.0 * M_PI * u2;
+            x = r * std::cos(phi);
+            y = r * std::sin(phi);
+            z = vtx.vertexRadius * std::sqrt(1.0 - u1);
+        }
         double time = vtx.fastTime.Evaluate(current_event_id, v_i, 0.0);
         double vtxWeight = vtx.fastWeight.Evaluate(current_event_id, v_i, 0.0);
         if (vtxWeight <= 0.0) continue;
@@ -494,7 +493,7 @@ void ParticleGunSource::GeneratePrimaries(G4Event* event) {
         if (vertex->GetNumberOfParticle() > 0) {
             generatedVertices.push_back(vertex);
             weights.push_back(vtxWeight);
-            BeamAnalysis::Instance()->Fill("primary", UnifiedSource(vertex, lastParticle));
+            BeamAnalysis::Instance()->Fill("primary", UnifiedSource(vertex, lastParticle, fSourceName));
         } else {
             delete vertex;
         }

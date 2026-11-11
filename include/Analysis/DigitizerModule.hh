@@ -25,6 +25,8 @@
 #include "DetectorRegistry.hh"
 #include "Digit.hh"
 #include "ExpressionEvaluator.hh"
+#include "IDigitizerStage.hh"
+#include <memory>
 #include <vector>
 #include <unordered_map>
 #include <array>
@@ -35,19 +37,34 @@ class Hit; // forward
 /// @brief Converts G4Hits into Digits with realistic detector effects.
 class DigitizerModule : public G4VDigitizerModule {
 public:
+    /// Ordered per-hit steps of the configurable singles pipeline.
+    enum PipelineStep {
+        kInvalid = -1,
+        kEfficiency, kSignalTime, kTimeSmear, kDeadTime, kEnergySmear, kGain,
+        kRecovery, kNoise, kEnergyFrame, kThreshold, kAfterpulse
+    };
+
     DigitizerModule(G4String name, DetectorRegistry* detReg, ExpressionEvaluator* eval = nullptr);
     virtual ~DigitizerModule();
 
     virtual void Digitize() override;
 
 private:
-    struct PendingHit {
-        G4double time;
-        G4double energy;
-        G4ThreeVector position;
-        G4int detectorID;
-        G4int trackID;
-    };
+    // Modular chain stages (nested: access to private members).
+    struct HitCollectionStage;
+    struct HitProcessingStage;
+    struct CalorimeterStage;
+    struct PileupStage;
+    struct DarkCountStage;
+    struct CrosstalkStage;
+    struct CoincidenceStage;
+    void BuildChain();
+    static PipelineStep ParsePipelineStep(const std::string& name);
+    static const std::vector<PipelineStep>& DefaultPipeline();
+    const std::vector<PipelineStep>& GetPipeline(G4int detId) const;
+    std::vector<std::unique_ptr<IDigitizerStage>> fGlobalChain;                 ///< cross-detector stages (crosstalk, coincidence)
+    std::unordered_map<G4int, std::vector<std::unique_ptr<IDigitizerStage>>> fDetectorChains;  ///< per-detector chains
+    std::unique_ptr<IDigitizerStage> fCollectionStage;                          ///< hit collection/grouping
 
     // Helper methods
     void ProcessPileup(std::vector<PendingHit>& hits, const DetectorProperties& props,
@@ -65,15 +82,22 @@ private:
     G4double ApplyTimeSmearing(G4double rawTime, const Hit* hit,
                                G4int eventId, const DetectorProperties& props) const;
     G4double ApplyEnergySmearing(G4double rawEnergy, const Hit* hit,
-                                 const DetectorProperties& props) const;
-    bool ApplyQuantumEfficiency(const DetectorProperties& props) const;
-    G4double ApplyGain(G4double energy, const DetectorProperties& props) const;
+                                 const DetectorProperties& props, G4int eventId) const;
+    G4double ApplyGain(G4double energy, const Hit* hit, G4int eventId, const DetectorProperties& props) const;
+    G4double ApplyNoise(G4double energy, const Hit* hit, G4int eventId, const DetectorProperties& props, G4double& noise) const;
+    bool PassThreshold(G4double energy, const Hit* hit, G4int eventId, const DetectorProperties& props) const;
+    G4double ApplyRecovery(G4int detId, G4double time, G4double energy, const DetectorProperties& props);
+    G4double EfficiencyProbability(G4double energy, const Hit* hit, G4int eventId, const DetectorProperties& props) const;
+    G4ThreeVector ApplySpatialResolution(const G4ThreeVector& pos, const DetectorProperties& props) const;
 
     // Prepare variable maps for expressions (uses thread_local cache)
+    void PrepareCommonVars(std::map<std::string, double>& vars, const DetectorProperties& props) const;
+    void PrepareHitVars(std::map<std::string, double>& vars, const Hit* hit,
+                        G4double energy, G4int eventId) const;
     void PrepareTimeVars(std::map<std::string, double>& vars, G4double rawTime, const Hit* hit,
                          G4int eventId, const DetectorProperties& props) const;
     void PrepareEnergyVars(std::map<std::string, double>& vars, G4double rawEnergy, const Hit* hit,
-                           const DetectorProperties& props) const;
+                           G4int eventId, const DetectorProperties& props) const;
     void PreparePileupVars(std::map<std::string, double>& vars, const std::vector<PendingHit>& hits,
                            size_t start, size_t end, G4int eventId, const DetectorProperties& props) const;
 
@@ -88,10 +112,12 @@ private:
     static constexpr G4double kNeverHit = -1e12;
     std::vector<G4double> fLastHitTime;   // for nonparalyzable
     std::vector<G4double> fDeadUntil;     // for paralyzable
+    std::vector<G4int>    fBufferCount;   // dead-time buffer occupancy (per detector)
     G4int fMaxDetectorID = -1;
+    G4int fLastRunID = -1;                // run ID at last dead-time reset
 
-    // Pile-up buffer
-    std::vector<PendingHit> fPendingHits;
+    std::unordered_map<G4int, std::vector<PipelineStep>> fPipeline;  ///< per-detector step order
+
 };
 
 #endif

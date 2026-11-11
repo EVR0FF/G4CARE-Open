@@ -72,7 +72,7 @@ public:
             if (ptr_event_id) *ptr_event_id = event_id;
             if (ptr_v_i)      *ptr_v_i      = v_i;
             if (ptr_p_i)      *ptr_p_i      = p_i;
-            // Apply EXPRS runtime variables (EXPRS feedback → SOURCE)
+            // Apply SCRIPT.scripts runtime variables (SCRIPT.scripts feedback → SOURCE)
             for (const auto& [vname, vptr] : comp->varPtrs) {
                 double rtVal = ConfigManager::GetRuntime(vname);
                 if (rtVal != 0.0 || ConfigManager::GetAllRuntime().count(vname))
@@ -125,6 +125,8 @@ private:
         ExpressionEvaluator::PrecompiledExpr timeExpr;
         ExpressionEvaluator::PrecompiledExpr weightExpr;
         ExpressionEvaluator::PrecompiledExpr rejectIfExpr;
+        double vertexRadius = 0.0;
+        bool hemisphere = false;
         std::vector<ParticleDesc> particles;
 
         FastExpr fastPosX, fastPosY, fastPosZ;
@@ -133,11 +135,6 @@ private:
         FastExpr fastRejectIf;
     };
 
-    struct VarExpr {
-        std::string name;
-        ExpressionEvaluator::PrecompiledExpr expr;
-        FastExpr fast;
-    };
 
     enum class VertexMode { kSequential, kRandom };
 
@@ -147,7 +144,6 @@ private:
 
     std::string fSourceName;
     std::unique_ptr<ExpressionEvaluator> fEval;
-    std::vector<VarExpr> fVars;
     std::vector<VertexDesc> fVertices;
     std::unique_ptr<GenericVertexGenerator> fVertexGenerator;
     VertexMode fVertexMode = VertexMode::kSequential;

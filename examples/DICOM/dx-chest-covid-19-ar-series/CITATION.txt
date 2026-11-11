@@ -1,0 +1,8 @@
+Chest X-ray — Rural COVID-19 Population Study
+Source collection: COVID-19-AR (Chest Imaging of a Rural COVID-19 Population)
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Data citation:
+Desai, S., Baghal, A., Wongsurawat, T., Al-Shukri, S., Gates, K., Farmer, P., Rutherford, M., Blake, G.D., Nolan, T., Powell, T., Sexton, K., Bennett, W., Prior, F. (2020). Data from Chest Imaging with Clinical and Genomic Correlates Representing a Rural COVID-19 Positive Population [Data set]. The Cancer Imaging Archive. https://doi.org/10.7937/tcia.2020.py71-5978
+
+Redistributed by Saga IT (saga-it.com/dicom/samples) under the Creative Commons Attribution license above. Sourced from the NCI Imaging Data Commons (portal.imaging.datacommons.cancer.gov).

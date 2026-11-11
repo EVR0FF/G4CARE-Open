@@ -1,0 +1,8 @@
+Head MR — Vestibular Schwannoma Routine MRI
+Source collection: Vestibular-Schwannoma-MC-RC
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Data citation:
+Kujawa, A., Dorent, R., Wijethilake, N., Connor, S., Thomson, S., Ivory, M., Bradford, R., Kitchen, N., Bisdas, S., Ourselin, S., Vercauteren, T., & Shapey, J. (2023). Segmentation of Vestibular Schwannoma from Magnetic Resonance Imaging: An Annotated Multi-Center Routine Clinical Dataset (Vestibular-Schwannoma-MC-RC) (Version 1) [dataset]. The Cancer Imaging Archive. https://doi.org/10.7937/HRZH-2N82
+
+Redistributed by Saga IT (saga-it.com/dicom/samples) under the Creative Commons Attribution license above. Sourced from the NCI Imaging Data Commons (portal.imaging.datacommons.cancer.gov).

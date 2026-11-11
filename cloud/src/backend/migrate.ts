@@ -1,8 +1,12 @@
 //==============================================================================
-// G4CARE cloud — apply migrations/*.sql (idempotent) to PostgreSQL.
+// G4CARE - migrate.ts — Cloud backend: migrations
 //
-// The backend runs this on boot so that upgrades work on an existing `pgdata`
-// volume (Postgres' docker-entrypoint-initdb.d only runs on a fresh database).
+// Cloud backend: migrations
+//
+// @author I. I. Everstov  @author V. F. Myshkin (Scientific Supervisor)
+// @date 2026-11-11  @version 0.9.3
+// @copyright Copyright (c) 2026 G4CARE Developers
+// @license SPDX-License-Identifier: Apache-2.0
 //==============================================================================
 
 import { readdir, readFile } from 'node:fs/promises';

@@ -5,11 +5,10 @@
 //          temperature, pressure, state, radiation/nuclear lengths, Z_eff,
 //          A_eff, chemical formula) from the VolumeMaterialRegistry.
 // @details MaterialExtractor resolves numeric material properties via the
-//   VolumeMaterialRegistry and associated TypedRegistries (MaterialName,
-//   ChemicalFormula).  The string overload builds a human-readable elemental
-//   fraction string for the ChemicalFormula column.
+//   VolumeMaterialRegistry.  The string overload returns the material name
+//   or a human-readable elemental fraction string for ChemicalFormula.
 //
-//   Configuration keys read: none (registry-driven).
+//   Configuration keys read: none.
 // @author  I. I. Everstov
 // @author  V. F. Myshkin (Scientific Supervisor)
 // @date    2026-07-15  @version 0.9.0
@@ -21,9 +20,8 @@
 #include "G4SystemOfUnits.hh"
 
 /// @brief Extracts a numeric material column value for the given material ID.
-/// @param type  Column type (MaterialID, MaterialName-as-ID, Density,
-///              Temperature, Pressure, State, RadiationLength,
-///              NuclearInteractionLength, Zeff, Aeff, ChemicalFormula-as-ID).
+/// @param type  Column type (MaterialID, Density, Temperature, Pressure, State,
+///              RadiationLength, NuclearInteractionLength, Zeff, Aeff).
 /// @param src   UnifiedSource (unused for numeric lookup).
 /// @param matId Material ID in the VolumeMaterialRegistry.
 /// @return Extracted value, or -1.0/0.0 if invalid.
@@ -33,12 +31,6 @@ double MaterialExtractor::Get(ColType type, const UnifiedSource& src, int matId)
     switch (type) {
         case ColType::MaterialID:
             return static_cast<double>(matId);
-
-        case ColType::MaterialName:
-            if (fMaterialNameReg) {
-                return static_cast<double>(fMaterialNameReg->GetID(fRegistry->GetMaterialName(matId)));
-            }
-            return 0.0;
 
         case ColType::Density:
             return fRegistry->GetMaterialDensity(matId) / (g/cm3);
@@ -63,12 +55,6 @@ double MaterialExtractor::Get(ColType type, const UnifiedSource& src, int matId)
 
         case ColType::Aeff:
             return fRegistry->GetMaterialAeff(matId);
-
-        case ColType::ChemicalFormula:
-            if (fChemicalFormulaReg) {
-                return static_cast<double>(fChemicalFormulaReg->GetID(fRegistry->GetMaterialChemicalFormula(matId)));
-            }
-            return 0.0;
 
         default:
             return 0.0;

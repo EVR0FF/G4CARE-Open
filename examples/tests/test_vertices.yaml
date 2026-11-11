@@ -1,0 +1,65 @@
+# ── Тест вершинных источников: VERTEX_GENERATOR (сфера/объём/поверхность) + VERTICES ──
+EVENTS: 50
+NTHREADS: 1
+VISUALIZATION: true
+SEED: [1]
+
+GEOMETRY:
+  WORLD:
+    shape: "box"
+    material: "G4_AIR"
+    DIMENSIONS: ["1*m", "1*m", "1*m"]
+  OBJECTS:
+    target:
+      name: "Target"
+      shape: "box"
+      material: "G4_WATER"
+      DIMENSIONS: ["20*cm", "20*cm", "20*cm"]
+      POSITION: ["0*cm", "0*cm", "30*cm"]
+
+SOURCE:
+  # 1) Математическая сфера (в визуализаторе — ЗЕЛЁНАЯ wireframe-сфера)
+  sphere:
+    type: "particleGun"
+    VERTEX_GENERATOR:
+      radius: "15*cm"
+      center: {x: "0*cm", y: "0*cm", z: "0*cm"}
+      count: 1
+      PARTICLES:
+        0: {particle: "gamma", energy: "1*MeV"}
+
+  # 2) Равномерно ВНУТРИ объёма Target
+  in_volume:
+    type: "particleGun"
+    VERTEX_GENERATOR:
+      volume: "Target"
+      count: 1
+      PARTICLES:
+        0: {particle: "e-", energy: "1*MeV"}
+
+  # 3) Равномерно НА поверхности Target
+  on_surface:
+    type: "particleGun"
+    VERTEX_GENERATOR:
+      surface: "Target"
+      count: 1
+      PARTICLES:
+        0: {particle: "gamma", energy: "0.5*MeV"}
+
+  # 4) Две ручные вершины — два отдельных пучка
+  two_beams:
+    type: "particleGun"
+    vertex_mode: sequential
+    VERTICES:
+      0:
+        pos: {x: "-20*cm", y: "0*cm", z: "0*cm"}
+        PARTICLES:
+          0: {particle: "proton", energy: "1*MeV"}
+      1:
+        pos: {x: "20*cm", y: "0*cm", z: "0*cm"}
+        PARTICLES:
+          0: {particle: "proton", energy: "1*MeV"}
+
+PHYSICS:
+  BASIC:
+    LIST: "QGSP_BERT_EMV"

@@ -1,4 +1,13 @@
-// Mirrors cloud/src/shared/types.ts (backend) so the dashboard stays consistent.
+//==============================================================================
+// G4CARE - types.ts — Cloud frontend: types
+//
+// Cloud frontend: types
+//
+// @author I. I. Everstov  @author V. F. Myshkin (Scientific Supervisor)
+// @date 2026-11-11  @version 0.9.3
+// @copyright Copyright (c) 2026 G4CARE Developers
+// @license SPDX-License-Identifier: Apache-2.0
+//==============================================================================
 
 export type ArtifactType = 'yaml' | 'gdml' | 'so' | 'mac' | 'bundle' | 'other';
 

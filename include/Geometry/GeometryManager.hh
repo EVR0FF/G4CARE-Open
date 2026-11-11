@@ -55,6 +55,7 @@
 class ObjectManager;
 class G4LogicalVolume;
 class VoxelizedPhantom;
+struct CTSeries;
 
 /// @brief Top-level geometry construction: world, target, objects, SDs.
 ///
@@ -103,6 +104,13 @@ public:
     G4ThreeVector GetTargetPosition() const;
 
 private:
+    /// @brief Apply GEOMETRY.OVERRIDES placement overrides by physical volume name.
+    void ApplyOverrides();
+
+    /// @brief Read/prepare the DICOM CT (GUI transfer selection or config) for
+    ///        the phantom build. Returns false when no CT is available.
+    bool PrepareDicomCT(CTSeries& out);
+
     G4VPhysicalVolume* fTargetPV;                       ///< Target placement volume.
     G4VPhysicalVolume* fWorldPV;                         ///< World placement volume.
     G4GDMLParser fParser;                                ///< GDML file parser.

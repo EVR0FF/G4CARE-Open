@@ -1,9 +1,12 @@
 //==============================================================================
-// G4CARE cloud — object storage abstraction (filesystem implementation).
+// G4CARE - storage.ts — Cloud backend: storage
 //
-// Production deployments can swap this for an S3-compatible backend (MinIO,
-// SeaweedFS, AWS, …) without changing
-// the server code (same put/get/delete contract).
+// Cloud backend: storage
+//
+// @author I. I. Everstov  @author V. F. Myshkin (Scientific Supervisor)
+// @date 2026-11-11  @version 0.9.3
+// @copyright Copyright (c) 2026 G4CARE Developers
+// @license SPDX-License-Identifier: Apache-2.0
 //==============================================================================
 
 import { mkdir, writeFile, readFile, rm } from 'node:fs/promises';

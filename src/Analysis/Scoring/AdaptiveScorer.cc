@@ -309,7 +309,6 @@ void AdaptiveScorer::ExportToBeamAnalysis(BeamAnalysis* beamAnalysis,
         values["Count"]       = static_cast<double>(data->count);
         values["Uncertainty"] = data->RelativeUncertainty();
 
-        beamAnalysis->Fill("AdaptiveScoring", values);
     }
 
     delete navigator;

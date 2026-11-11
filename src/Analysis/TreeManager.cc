@@ -4,16 +4,15 @@
 //
 // @file    TreeManager.cc
 // @brief   NTuple tree builder from YAML — column lists, filter expressions,
-//          dictionary support, and ROOT NTuple creation.
+//          string columns, and ROOT NTuple creation.
 //
 // @details
 //   Reads NTUPLE.<name> YAML blocks and builds per-tree column descriptors
-//   (ColType enum with optional expression/filter).  Supports dictionary
-//   columns (integer indices into typed registries with separate dictionary
-//   trees), string columns, and ExprTK filter expressions.
+//   (ColType enum with optional expression/filter).  Supports string columns
+//   and ExprTK filter expressions.
 //
 //   Configuration keys read:
-//     NTUPLE.<name>.columns, NTUPLE.<name>.filter, ENABLE_DICTIONARY
+//     NTUPLE.<name>.columns, NTUPLE.<name>.filter
 //
 // @author  I. I. Everstov
 // @author  V. F. Myshkin (Scientific Supervisor)
@@ -196,12 +195,18 @@ static const std::unordered_map<std::string_view, ColType> nameToColType = {
     {"digit_type", ColType::DigitType},
     {"energy", ColType::Edep}, {"time", ColType::GlobalTime},
     {"raw_energy_MeV", ColType::RawEnergy},
+    {"digit_energy_MeV", ColType::DigitEnergy},
+    {"coincidence_id", ColType::CoincidenceID},
     {"raw_time_ns", ColType::RawTime},
     {"pileup_size", ColType::PileupSize},
     {"is_pileup", ColType::IsPileup},
     {"afterpulse", ColType::Afterpulse},
     {"quantum_efficiency", ColType::QuantumEfficiency},
     {"noise_energy_MeV", ColType::NoiseEnergy},
+    {"hit_edep_MeV", ColType::HitEdep},
+    {"strip_number", ColType::StripNumber},
+    {"plane_number", ColType::PlaneNumber},
+    {"is_x_plane", ColType::IsXPlane},
 
     // Cross-sections
     {"NeutronCaptureXS", ColType::NeutronCaptureXS},
@@ -238,8 +243,11 @@ static const std::unordered_map<std::string_view, ColType> nameToColType = {
 
 // ── Physical quantity units ──
 // Appended as suffixes to ROOT branch names.
-// String/dictionary/dimensionless columns have no suffix.
+// String/dimensionless columns have no suffix.
 static const std::map<ColType, std::string> colTypeToUnit = {
+    // NOTE: raw_energy_MeV / raw_time_ns / noise_energy_MeV already carry their unit
+    // in the config name, so RawEnergy/RawTime/NoiseEnergy are intentionally absent
+    // from this map (avoids double suffix like raw_energy_MeV_MeV).
     // Energy → MeV
     {ColType::KineticEnergy,      "MeV"},
     {ColType::TotalEnergy,        "MeV"},
@@ -248,10 +256,8 @@ static const std::map<ColType, std::string> colTypeToUnit = {
     {ColType::Edep,               "MeV"},
     {ColType::DeltaE,             "MeV"},
     {ColType::NIEL,               "MeV"},
-    {ColType::Mass,               "MeV/c2"},
+    {ColType::Mass,               "MeV_c2"},
     {ColType::VertexKineticEnergy,"MeV"},
-    {ColType::RawEnergy,          "MeV"},
-    {ColType::NoiseEnergy,        "MeV"},
     {ColType::SmearedEdep,        "MeV"},
     {ColType::VisibleEdep,        "MeV"},
 
@@ -272,7 +278,7 @@ static const std::map<ColType, std::string> colTypeToUnit = {
     {ColType::StepLength, "mm"},
     {ColType::TrackLength,"mm"},
     {ColType::Safety,     "mm"},
-    {ColType::StepGrammage,"g/cm2"},
+    {ColType::StepGrammage,"g_cm2"},
     {ColType::MeanFreePath,"mm"},
     {ColType::RadiationLength,"mm"},
     {ColType::NuclearInteractionLength,"mm"},
@@ -282,13 +288,12 @@ static const std::map<ColType, std::string> colTypeToUnit = {
     {ColType::LocalTime,   "ns"},
     {ColType::ProperTime,  "ns"},
     {ColType::DeltaTime,   "ns"},
-    {ColType::RawTime,     "ns"},
     {ColType::AtRestLifeTime,"ns"},
     {ColType::ParticleLifetime,"ns"},
 
     // Dosimetry
     {ColType::DoseGy, "Gy"},
-    {ColType::LET,    "keV/um"},
+    {ColType::LET,    "keV_um"},
 
     // Optics
     {ColType::OpticalWavelength, "nm"},
@@ -297,7 +302,7 @@ static const std::map<ColType, std::string> colTypeToUnit = {
     {ColType::VolumeMass,  "kg"},
 
     // Density / temperature / pressure
-    {ColType::Density,     "g/cm3"},
+    {ColType::Density,     "g_cm3"},
     {ColType::Temperature, "K"},
     {ColType::Pressure,    "atm"},
 
@@ -310,14 +315,14 @@ static const std::map<ColType, std::string> colTypeToUnit = {
 
     // Particles
     {ColType::Charge, "e"},
-    {ColType::AtRestRate, "MeV/ns"},
+    {ColType::AtRestRate, "MeV_ns"},
     {ColType::ParticleWidth, "MeV"},
-    {ColType::IsotopeMass, "MeV/c2"},
+    {ColType::IsotopeMass, "MeV_c2"},
     {ColType::IsotopeLifetime, "ns"},
 };
 
-/// @brief Column types that are stored as dictionary (int index) references.
-static const std::unordered_set<ColType> dictionaryTypes = {
+/// @brief Column types that are stored as string columns.
+static const std::unordered_set<ColType> stringColumnTypes = {
     ColType::VolumeName,
     ColType::MaterialName,
     ColType::RegionName,
@@ -331,317 +336,22 @@ static const std::unordered_set<ColType> dictionaryTypes = {
     ColType::CreatorProcessName,
 };
 
-/// @brief Mapping from dictionary ColType to the corresponding registry tree name.
-static const std::unordered_map<ColType, std::string> typeToDictName = {
-    {ColType::VolumeName, "volume_dict"},
-    {ColType::MaterialName, "material_dict"},
-    {ColType::RegionName, "region_dict"},
-    {ColType::SourceName, "source_dict"},
-    {ColType::DetectorName, "detector_dict"},
-    {ColType::TouchablePath, "touchable_dict"},
-    {ColType::ChemicalFormula, "chemical_formula_dict"},
-    {ColType::SpeciesID, "chemical_species_dict"},
-    {ColType::ParticleName, "particle_dict"},
-    {ColType::ProcessName, "process_dict"},
-    {ColType::CreatorProcessName, "process_dict"},
-};
-
-TreeManager::TreeManager(VolumeMaterialRegistry& registry,
-                         ExpressionEvaluator& evaluator,
-                         CrossSectionCalculator* xsCalc,
-                         G4AnalysisManager* analysisManager,
-                         TypedRegistry<std::string>* particleNameReg,
-                         TypedRegistry<std::string>* volumeNameReg,
-                         TypedRegistry<std::string>* materialNameReg,
-                         TypedRegistry<std::string>* regionNameReg,
-                         TypedRegistry<std::string>* sourceNameReg,
-                         TypedRegistry<std::string>* detectorNameReg,
-                         TypedRegistry<std::string>* touchablePathReg,
-                         TypedRegistry<std::string>* chemicalFormulaReg,
-                         TypedRegistry<int>* pdgReg,
-                         TypedRegistry<int>* processSubTypeReg,
-                         TypedRegistry<double>* massReg,
-                         TypedRegistry<double>* chargeReg,
-                         DetectorRegistry* detReg, SurfaceRegistry* surfReg, TypedRegistry<std::string>* chemSpeciesReg)
-    : fRegistry(registry),
-      fEvaluator(evaluator),
-      fXSCalculator(xsCalc),
-      fAnalysisManager(analysisManager),
-      fParticleNameReg(particleNameReg),
-      fVolumeNameReg(volumeNameReg),
-      fMaterialNameReg(materialNameReg),
-      fRegionNameReg(regionNameReg),
-      fSourceNameReg(sourceNameReg),
-      fDetectorNameReg(detectorNameReg),
-      fTouchablePathReg(touchablePathReg),
-      fChemicalFormulaReg(chemicalFormulaReg),
-      fPDGReg(pdgReg),
-      fProcessSubTypeReg(processSubTypeReg),
-      fMassReg(massReg),
-      fChargeReg(chargeReg),
-      fDetectorRegistry(detReg), fSurfaceRegistry(surfReg) {}
-
-/// @brief Build an NTuple tree from the NTUPLE.<treeName> YAML config block.
-///
-/// Reads NTUPLE.<treeName>.columns (list of column names) and optionally
-/// NTUPLE.<treeName>.filter (scalar string or {volumes, condition} map).
-/// For each column:
-/// - If the column name matches a registered ExpressionManager expression,
-///   the column type is set to Expression with a symbolic reference.
-/// - If the name matches a known ColType in nameToColType, the column is
-///   configured as a built-in type.  Dictionary columns may be stored as
-///   integer indices (ENABLE_DICTIONARY=true) or direct strings (=false).
-/// - If the name is an ExprTK expression (ConfigManager::IsExpression),
-///   it is compiled via PrecompileForFilter and added as an expression column.
-///
-/// Filter parsing supports three formats:
-/// 1. Scalar string: `filter: "edep > 0"` (legacy).
-/// 2. Map: `filter: {volumes: [...], condition: "edep > 0"}` (new).
-/// 3. Key-value under NTUPLE.<treeName>.filter (backward compat).
-///
-/// Unit suffixes are automatically appended to numeric columns (e.g. `edep_MeV`).
-/// A `run_id` column is always appended if not explicitly requested.
-///
-/// @param treeName NTuple tree name (e.g. "g4care", "secondary", "activation").
-/// @param cfg      ConfigManager instance providing YAML access.
-void TreeManager::CreateTreeFromConfig(const std::string& treeName, ConfigManager* cfg) {
-    std::string base = "NTUPLE." + treeName + ".";
-    std::vector<std::string> colNames = cfg->GetStringVector(base + "columns");
-    if (colNames.empty()) {
-        G4cerr << "TreeManager: No columns defined for tree '" << treeName << "'" << G4endl;
-        return;
+/// @brief Resolve a column name to ColType / string-ness / ROOT branch name.
+/// @param colName    Column name from config (e.g. "kinetic_energy").
+/// @param type       [out] Resolved ColType.
+/// @param isString   [out] true if this is a string column.
+/// @param branchName [out] Branch name including unit suffix (e.g. "kinetic_energy_MeV").
+/// @return true if the name is a known built-in column.
+bool TreeManager::ResolveColumn(const std::string& colName, ColType& type, bool& isString, std::string& branchName) {
+    std::string_view sv(colName);
+    auto it = nameToColType.find(sv);
+    if (it == nameToColType.end()) return false;
+    type = it->second;
+    isString = (stringColumnTypes.count(type) != 0);
+    branchName = colName;
+    if (!isString) {
+        auto uIt = colTypeToUnit.find(type);
+        if (uIt != colTypeToUnit.end()) { branchName += "_"; branchName += uIt->second; }
     }
-
-    // Read ENABLE_DICTIONARY from global key (default true)
-    bool enableDict = cfg->GetBool("ENABLE_DICTIONARY", true);
-    G4cout << "TreeManager: ENABLE_DICTIONARY=" << (enableDict ? "true" : "false")
-           << " for tree '" << treeName << "'" << G4endl;
-
-    TreeInfo ti;
-    ti.ntupleId = fAnalysisManager->CreateNtuple(treeName, treeName);
-    G4cout << "TreeManager::CreateTreeFromConfig: tree='" << treeName
-           << "' ntupleId=" << ti.ntupleId << G4endl;
-
-    const std::vector<std::string>& filterVarNames = GetAllFilterVarNames();
-    const std::vector<FilterVar>& filterVarIndices = GetAllFilterVarIndices();
-
-    std::unordered_set<FilterVar> usedVarSet;
-    for (const auto& colName : colNames) {
-        ColumnInfo col;
-        col.name = colName;
-        std::string_view sv(colName);
-
-        // Check for ExpressionManager expressions (any name, resolved via ConfigManager)
-        auto exprDefs = cfg->GetExpressionDefinitions();
-        if (exprDefs.find(colName) != exprDefs.end()) {
-            col.type = ColType::Expression;
-            col.expressionRef = colName;
-            col.name = colName;
-        } else if (nameToColType.find(sv) != nameToColType.end()) {
-            auto it = nameToColType.find(sv);
-            col.type = it->second;
-            if (dictionaryTypes.count(col.type)) {
-                col.dictionaryName = typeToDictName.at(col.type);
-                if (enableDict) {
-                    // Dictionaries enabled — store int (registry ID) + separate dictionary tree
-                    col.isDictionary = true;
-                } else {
-                    // Dictionaries disabled — store raw string
-                    col.isSColumn = true;
-                }
-            }
-        } else if (cfg->IsExpression(base + colName)) {
-            col.type = ColType::Expression;
-            std::string exprStr = cfg->GetString(base + colName);
-            col.expr = fEvaluator.PrecompileForFilter(exprStr, filterVarIndices, filterVarNames);
-            if (col.expr) {
-                auto exprVars = fEvaluator.GetUsedVariables(col.expr.get());
-                usedVarSet.insert(exprVars.begin(), exprVars.end());
-            } else {
-                G4cerr << "TreeManager: Failed to compile expression '" << exprStr
-                       << "' for column '" << colName << "'" << G4endl;
-                continue;
-            }
-        } else {
-            G4cerr << "TreeManager: Unknown column '" << colName
-                   << "' in tree '" << treeName << "', skipping." << G4endl;
-            continue;
-        }
-
-        // Build column name with unit suffix for ROOT
-        std::string rootColName(colName);
-        if (!col.isDictionary && !col.isSColumn && col.type != ColType::Expression) {
-            auto uIt = colTypeToUnit.find(col.type);
-            if (uIt != colTypeToUnit.end()) {
-                rootColName += "_";
-                rootColName += uIt->second;
-            }
-        }
-
-        if (col.isDictionary) {
-            // Dictionary column — int (registry ID)
-            col.ntupleColumnId = fAnalysisManager->CreateNtupleIColumn(ti.ntupleId, rootColName);
-        } else if (col.isSColumn) {
-            // String column (dictionaries disabled)
-            col.ntupleColumnId = fAnalysisManager->CreateNtupleSColumn(ti.ntupleId, rootColName);
-        } else {
-            col.ntupleColumnId = fAnalysisManager->CreateNtupleDColumn(ti.ntupleId, rootColName);
-        }
-        ti.allColumns.push_back(col);
-        ti.activeColumns.push_back(ti.allColumns.size() - 1);
-    }
-
-    // ── Filter parsing: scalar (string) or map {volumes, condition} ──
-    auto filterNode = cfg->GetNode("NTUPLE." + treeName + ".filter");
-    if (filterNode.IsDefined()) {
-        if (filterNode.IsScalar()) {
-            // Legacy format: filter: "edep > 0"
-            std::string filterExpr = filterNode.as<std::string>();
-            auto compiledFilter = fEvaluator.PrecompileForFilter(filterExpr, filterVarIndices, filterVarNames);
-            if (compiledFilter) {
-                ti.filter = compiledFilter;
-                ti.filterVarIndices = fEvaluator.GetUsedVariables(compiledFilter.get());
-                usedVarSet.insert(ti.filterVarIndices.begin(), ti.filterVarIndices.end());
-            } else {
-                G4cerr << "TreeManager: Failed to compile filter '" << filterExpr << "'" << G4endl;
-            }
-        } else if (filterNode.IsMap()) {
-            // New format: filter: {volumes: [...], condition: "edep > 0"}
-            if (filterNode["volumes"].IsSequence()) {
-                for (const auto& v : filterNode["volumes"]) {
-                    ti.filterVolumes.push_back(v.as<std::string>());
-                }
-            }
-            if (filterNode["condition"].IsScalar()) {
-                std::string condStr = filterNode["condition"].as<std::string>();
-                auto condCompiled = fEvaluator.PrecompileForFilter(condStr, filterVarIndices, filterVarNames);
-                if (condCompiled) {
-                    ti.filterCondition = condCompiled;
-                    auto condVars = fEvaluator.GetUsedVariables(condCompiled.get());
-                    usedVarSet.insert(condVars.begin(), condVars.end());
-                } else {
-                    G4cerr << "TreeManager: Failed to compile filter condition '" << condStr << "'" << G4endl;
-                }
-            }
-            // Backward compat: if old filter expression still used
-            if (!ti.filterCondition && !ti.filter) {
-                std::string filterExpr = cfg->GetString(base + "filter", "");
-                if (!filterExpr.empty()) {
-                    auto compiledFilter = fEvaluator.PrecompileForFilter(filterExpr, filterVarIndices, filterVarNames);
-                    if (compiledFilter) {
-                        ti.filter = compiledFilter;
-                        ti.filterVarIndices = fEvaluator.GetUsedVariables(compiledFilter.get());
-                        usedVarSet.insert(ti.filterVarIndices.begin(), ti.filterVarIndices.end());
-                    }
-                }
-            }
-        }
-    } else {
-        // Backward compat: old string filter
-        std::string filterExpr = cfg->GetString(base + "filter", "");
-        if (!filterExpr.empty()) {
-            auto compiledFilter = fEvaluator.PrecompileForFilter(filterExpr, filterVarIndices, filterVarNames);
-            if (compiledFilter) {
-                ti.filter = compiledFilter;
-                ti.filterVarIndices = fEvaluator.GetUsedVariables(compiledFilter.get());
-                usedVarSet.insert(ti.filterVarIndices.begin(), ti.filterVarIndices.end());
-            } else {
-                G4cerr << "TreeManager: Failed to compile filter '" << filterExpr << "'" << G4endl;
-            }
-        }
-    }
-
-    ti.expressionVarIndices.assign(usedVarSet.begin(), usedVarSet.end());
-    ti.allNeededVarIndices = ti.expressionVarIndices;
-
-    bool hasRunId = false;
-    for (const auto& col : ti.allColumns) {
-        if (col.name == "run_id") { hasRunId = true; break; }
-    }
-    if (!hasRunId) {
-        ColumnInfo runIdCol;
-        runIdCol.name = "run_id";
-        runIdCol.type = ColType::RunID;
-        runIdCol.ntupleColumnId = fAnalysisManager->CreateNtupleDColumn(ti.ntupleId, "run_id");
-        ti.allColumns.push_back(runIdCol);
-        ti.activeColumns.push_back(ti.allColumns.size() - 1);
-    }
-    fAnalysisManager->FinishNtuple(ti.ntupleId);
-    fTrees[treeName] = std::move(ti);
-}
-
-/// @brief Compile a filter expression for an already-created tree info.
-///
-/// @param tree       TreeInfo to update (filter pointer and var list).
-/// @param filterExpr ExprTK filter expression string.
-/// @param varNames   Variable names for the ExprTK symbol table.
-void TreeManager::CompileFilter(TreeInfo& tree, const std::string& filterExpr,
-                                const std::vector<std::string>& varNames) {
-    if (filterExpr.empty()) {
-        tree.filter.reset();
-        tree.filterVarIndices.clear();
-        return;
-    }
-
-    const std::vector<FilterVar>& filterVarIndices = GetAllFilterVarIndices();
-    const std::vector<std::string>& filterVarNames = GetAllFilterVarNames();
-
-    auto compiled = fEvaluator.PrecompileForFilter(filterExpr, filterVarIndices, filterVarNames);
-    if (compiled) {
-        tree.filter = compiled;
-        tree.filterVarIndices = fEvaluator.GetUsedVariables(compiled.get());
-    } else {
-        G4cerr << "TreeManager: Failed to compile filter '" << filterExpr << "'" << G4endl;
-    }
-}
-
-/// @brief Look up an NTuple tree by name (mutable).
-/// @param name Tree name (e.g. "g4care").
-/// @return     Pointer to TreeInfo, or nullptr.
-TreeManager::TreeInfo* TreeManager::GetTree(const std::string& name) {
-    auto it = fTrees.find(name);
-    if (it != fTrees.end()) return &it->second;
-    return nullptr;
-}
-
-/// @brief Look up an NTuple tree by name (const).
-/// @param name Tree name.
-/// @return     Pointer to TreeInfo, or nullptr.
-const TreeManager::TreeInfo* TreeManager::GetTree(const std::string& name) const {
-    auto it = fTrees.find(name);
-    if (it != fTrees.end()) return &it->second;
-    return nullptr;
-}
-
-/// @brief Resolve a dictionary integer ID to a human-readable string.
-///
-/// @param dictName Registry tree name (e.g. "volume_dict", "material_dict").
-/// @param id       Integer ID from the corresponding typed registry.
-/// @return         Human-readable string, or empty string if not found.
-std::string TreeManager::GetDictString(const std::string& dictName, int id) const {
-    if (dictName == "volume_dict" && fVolumeNameReg) {
-        return fVolumeNameReg->GetValue(id);
-    }
-    if (dictName == "material_dict" && fMaterialNameReg) {
-        return fMaterialNameReg->GetValue(id);
-    }
-    if (dictName == "source_dict" && fSourceNameReg) {
-        return fSourceNameReg->GetValue(id);
-    }
-    if (dictName == "detector_dict" && fDetectorNameReg) {
-        return fDetectorNameReg->GetValue(id);
-    }
-    if (dictName == "touchable_dict" && fTouchablePathReg) {
-        return fTouchablePathReg->GetValue(id);
-    }
-    if (dictName == "chemical_formula_dict" && fChemicalFormulaReg) {
-        return fChemicalFormulaReg->GetValue(id);
-    }
-    if (dictName == "chemical_species_dict" && fChemSpeciesReg) {
-        return fChemSpeciesReg->GetValue(id);
-    }
-    if (dictName == "particle_dict" && fParticleNameReg) {
-        return fParticleNameReg->GetValue(id);
-    }
-    return "";
+    return true;
 }

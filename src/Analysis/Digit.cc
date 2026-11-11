@@ -19,7 +19,7 @@
 
 #include "Digit.hh"
 
-G4Allocator<Digit>* Digit::fAllocator = nullptr;
+G4ThreadLocal G4Allocator<Digit>* Digit::fAllocator = nullptr;
 
 /// @brief Default constructor — zero-initializes all fields.
 Digit::Digit() : fDetectorID(-1), fTime(0.), fEnergy(0.), fPosition(0.), fTrackID(-1),

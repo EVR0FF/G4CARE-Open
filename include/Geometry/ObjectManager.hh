@@ -16,10 +16,12 @@
 //   parameters, production cuts, and isotope composition.
 //
 //   Configuration keys read from GEOMETRY.OBJECTS.<id>.*:
-//     name, shape, material, DIMENSIONS, POSITION, size, pos.x/y/z,
+//     name, shape, material, DIMENSIONS, POSITION, ROTATION, size, pos.x/y/z,
 //     isSensitive, DIGITIZE.*, cuts.*, max_step_size,
 //     record_ion_production, isotopes, isotope, mother,
-//     REPLICA.axis, REPLICA.count, REPLICA.step, REPLICA.offset,
+//     REPLICA.mode (linear|grid|polar), REPLICA.axis, REPLICA.count,
+//     REPLICA.step, REPLICA.offset, REPLICA.nx/ny/nz, REPLICA.dx/dy/dz,
+//     REPLICA.radius, REPLICA.startAngle, REPLICA.totalAngle, REPLICA.rotate,
 //     CHILDREN.<id>.* (nested objects).
 //
 // @author  I. I. Everstov
@@ -44,12 +46,21 @@
 #include <map>
 #include <string>
 
-/// @brief Descriptor for parametric replication (REPLICA in YAML)
+/// @brief Descriptor for parametric replication (REPLICA in YAML).
 struct ReplicaDesc {
-    std::string axis = "";   ///< Replication axis: "x", "y", or "z"
-    int count = 0;           ///< Number of replicas
-    double step = 0.0;       ///< Step size between replicas (mm)
-    double offset = 0.0;     ///< Offset of first replica from origin (mm)
+    std::string mode = "linear";  ///< "linear" | "grid" | "polar"
+    std::string axis = "z";       ///< linear axis / grid plane normal / polar axis
+    int count = 0;                ///< linear count / polar count
+    double step = 0.0;            ///< linear step (mm)
+    double offset = 0.0;          ///< linear offset of the first copy (mm)
+    // grid: rectangular lattice in the plane normal to `axis`
+    int nx = 0, ny = 0, nz = 0;
+    double dx = 0.0, dy = 0.0, dz = 0.0;
+    // polar: circular array around `axis`
+    double radius = 0.0;
+    double startAngle = 0.0;      ///< first copy angle (deg)
+    double totalAngle = 360.0;    ///< angular span (deg)
+    bool rotate = false;          ///< rotate each copy to face the circle centre
 };
 
 struct ObjDesc {
@@ -60,6 +71,7 @@ struct ObjDesc {
     std::string gdmlFile;  ///< GDML file for geometry+material (shape/material/DIMENSIONS ignored if set)
     std::vector<std::string> rawSizes;
     G4ThreeVector pos;
+    G4ThreeVector rot;  ///< Euler angles in degrees [x, y, z] (applied X then Y then Z)
     bool isSensitive = false;
     std::string isotope;
     std::vector<std::pair<std::string, double>> isotopes;
@@ -73,7 +85,7 @@ struct ObjDesc {
     DetectorProperties digitizeProps;
     ReplicaDesc replica;                    ///< REPLICA configuration
     std::vector<ObjDesc> children;          ///< CHILDREN objects placed inside each replica
-    ObjDesc() : pos(0,0,0), fMaxStepSize(0.0), fRecordIonProduction(false) {}
+    ObjDesc() : pos(0,0,0), rot(0,0,0), fMaxStepSize(0.0), fRecordIonProduction(false) {}
 };
 
 class ObjectManager {

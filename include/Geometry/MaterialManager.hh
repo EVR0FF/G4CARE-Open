@@ -94,6 +94,10 @@ private:
     G4Material* CreateMaterial(const MaterialDef& def);
     /// @brief Create a G4Element from an ElementDef.
     G4Element* CreateElement(const std::string& matName, const ElementDef& def);
+    /// @brief Load user materials from ~/Documents/g4care/materials/*.yaml.
+    void LoadMaterialsFromFolder();
+    /// @brief Build a material from a folder-file YAML node.
+    G4Material* BuildMaterialFromNode(const std::string& matId, const YAML::Node& node);
 };
 
 #endif

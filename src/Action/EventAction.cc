@@ -13,7 +13,7 @@
 //   1. Triggers the Geant4-DNA chemistry stage via G4DNAChemistryManager::Run().
 //   2. Notifies G4DNAChemistryManager of event end.
 //   3. Delegates to SteppingAction::AccumulateEventEnergy() for dose control.
-//   4. Executes event-level ExprTK scripts via ExprsManager.
+//   4. Executes event-level ExprTK scripts via ScriptsManager.
 //   5. Records isotope production data from UserEventInformation into the
 //      "activation" NTuple tree via BeamAnalysis.
 //
@@ -32,6 +32,7 @@
 //==============================================================================
 
 #include "EventAction.hh"
+#include "SimulationEngine.hh"
 #include "UserEventInformation.hh"
 #include "BeamAnalysis.hh"
 #include "G4RunManager.hh"
@@ -41,7 +42,7 @@
 #include "G4Scheduler.hh"
 #include "G4DNAChemistryManager.hh"
 #include "ConfigManager.hh"
-#include "ExprsManager.hh"
+#include "ScriptsManager.hh"
 #include "G4LogicalVolume.hh"
 
 EventAction::EventAction() = default;
@@ -75,13 +76,16 @@ void EventAction::BeginOfEventAction(const G4Event* event) {
 /// 3. **Dose accumulation** — SteppingAction::AccumulateEventEnergy()
 ///    transfers thread-local event energy to the global atomic counter
 ///    and checks the dose threshold.
-/// 4. **EXPRS event scripts** — per-volume ExprTK event-level scripts
-///    are executed via ExprsManager::TryExecuteEventScripts() for each
+/// 4. **SCRIPT.scripts event scripts** — per-volume ExprTK event-level scripts
+///    are executed via ScriptsManager::TryExecuteEventScripts() for each
 ///    logical volume that received energy deposition.
 /// 5. **Isotope NTuple** — isotope production data collected by
 ///    UserEventInformation is written to the "activation" NTuple tree
 ///    via BeamAnalysis::Fill().
 void EventAction::EndOfEventAction(const G4Event* event) {
+    // Lock-free progress accounting (no mutex — std::atomic).
+    SimulationEngine::RecordEventCompleted();
+
     // ── Chemistry stage: MUST be BEFORE checking eventInfo! ──
     // G4DNAChemistryManager::Run() starts G4Scheduler.
     // G4DNAChemistryManager::EndOfEventAction(event) populates G4MoleculeCounter.
@@ -111,11 +115,11 @@ void EventAction::EndOfEventAction(const G4Event* event) {
     // Flush thread-local event energy BEFORE checking eventInfo!
     SteppingAction::AccumulateEventEnergy();
 
-    // ── EXPRS: count events per volume ──
+    // ── SCRIPT.scripts: count events per volume ──
     {
         extern thread_local std::set<const G4LogicalVolume*> g_tlEventVolumes;
         extern thread_local bool g_tlHadInteraction;
-        auto* sm = ExprsManager::Instance();
+        auto* sm = ScriptsManager::Instance();
         if (!sm->GetBlocks().empty()) {
             for (const auto* lv : g_tlEventVolumes) {
                 sm->EventEnd(lv, g_tlHadInteraction);
@@ -127,34 +131,10 @@ void EventAction::EndOfEventAction(const G4Event* event) {
     }
 
     // ── DigitizerModule: process digitization ──
-    G4DigiManager::GetDMpointer()->Digitize("DigitizerModule");
+    auto* dm = G4DigiManager::GetDMpointer();
+    if (dm->FindDigitizerModule("DigitizerModule")) dm->Digitize("DigitizerModule");
 
     UserEventInformation* eventInfo = static_cast<UserEventInformation*>(event->GetUserInformation());
     if (!eventInfo) return;
 
-    const auto& isotopes = eventInfo->GetIsotopes();
-    if (!isotopes.empty()) {
-        auto* analysis = BeamAnalysis::Instance();
-        G4int eventId = event->GetEventID();
-        G4int runId = analysis->GetCurrentRunId();
-
-        for (const auto& pair : isotopes) {
-            int pdg = pair.first;
-            double mass = std::get<0>(pair.second);
-            double lifeTime = std::get<1>(pair.second);
-            int count = std::get<2>(pair.second);
-
-            std::map<std::string, double> values;
-            values["event_id"] = eventId;
-            values["run_id"] = runId;
-            values["isotope_pdg"] = pdg;
-            values["isotope_count"] = count;
-            values["isotope_mass"] = mass / CLHEP::MeV;
-            values["isotope_lifetime"] = lifeTime / CLHEP::second;
-
-            analysis->Fill("activation", values);
-        }
-    }
-
-    eventInfo->Clear();
 }

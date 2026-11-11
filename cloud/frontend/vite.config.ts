@@ -9,6 +9,9 @@ export default defineConfig({
       '/artifacts': 'http://127.0.0.1:3000',
       '/auth': 'http://127.0.0.1:3000',
       '/health': 'http://127.0.0.1:3000',
+      '/folders': 'http://127.0.0.1:3000',
+      '/trash': 'http://127.0.0.1:3000',
+      '/share': 'http://127.0.0.1:3000',
     },
   },
 });

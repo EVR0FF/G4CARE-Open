@@ -38,10 +38,12 @@
 #include "SensitiveDetector.hh"
 #include "ObjectManager.hh"
 #include "DICOMReader.hh"
+#include "DicomService.hh"
 #include "DICOMResampler.hh"
 #include "HUToMaterialMap.hh"
 #include "Rasterizer.hh"
 #include "VoxelizedPhantom.hh"
+#include "DoseScorer.hh"
 #include "G4GDMLParser.hh"
 #include "G4NistManager.hh"
 #include "G4Box.hh"
@@ -52,6 +54,7 @@
 #include "G4Para.hh"
 #include "G4LogicalVolume.hh"
 #include "G4PVPlacement.hh"
+#include "G4RotationMatrix.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4ThreeVector.hh"
 #include "G4VSolid.hh"
@@ -74,9 +77,14 @@
 #include "G4DigiManager.hh"
 
 #include <sstream>
+#include <fstream>
 #include <algorithm>
 #include <cctype>
 #include <exception>
+#include <cstdlib>
+#include <cmath>
+
+#include <nlohmann/json.hpp>
 #include <memory>
 #include <set>
 #include <cstdio>
@@ -225,6 +233,74 @@ namespace {
                << "', falling back to box 1×1×1 m³." << G4endl;
         return new G4Box(name, 0.5*m, 0.5*m, 0.5*m);
     }
+
+    // World-space AABB (mm) of a CT volume, treating originMm as the corner of
+    // the first voxel and direction as [row(iy), col(ix), slice(iz)] (CTSeries).
+    bool PhantomAABB(const CTSeries& ct, double minv[3], double maxv[3]) {
+        if (!ct.valid || ct.nx <= 0 || ct.ny <= 0 || ct.nz <= 0) return false;
+        const double row[3] = {ct.direction[0], ct.direction[1], ct.direction[2]};
+        const double col[3] = {ct.direction[3], ct.direction[4], ct.direction[5]};
+        const double slc[3] = {ct.direction[6], ct.direction[7], ct.direction[8]};
+        const double ex = ct.nx * ct.dxMm;
+        const double ey = ct.ny * ct.dyMm;
+        const double ez = ct.nz * ct.dzMm;
+        for (int a = 0; a < 3; ++a) { minv[a] = 1e30; maxv[a] = -1e30; }
+        for (int i = 0; i < 2; ++i)
+            for (int j = 0; j < 2; ++j)
+                for (int k = 0; k < 2; ++k) {
+                    const double p[3] = {
+                        ct.originMm[0] + i * ex * col[0] + j * ey * row[0] + k * ez * slc[0],
+                        ct.originMm[1] + i * ex * col[1] + j * ey * row[1] + k * ez * slc[1],
+                        ct.originMm[2] + i * ex * col[2] + j * ey * row[2] + k * ez * slc[2],
+                    };
+                    for (int a = 0; a < 3; ++a) {
+                        if (p[a] < minv[a]) minv[a] = p[a];
+                        if (p[a] > maxv[a]) maxv[a] = p[a];
+                    }
+                }
+        return true;
+    }
+
+    // Expand an AABB (mm) to include a coordinate read from the config when it
+    // is a plain number. The GUI writes source positions as plain mm values;
+    // unit suffixes / ExprTK expressions are ignored (rare in GUI-placed beams).
+    void ExpandAabbCoord(ConfigManager* cfg, const std::string& key,
+                         int axis, double minv[3], double maxv[3]) {
+        const std::string raw = cfg->GetString(key, "");
+        if (raw.empty()) return;
+        const char* c = raw.c_str();
+        char* end = nullptr;
+        const double v = std::strtod(c, &end);
+        if (end == c || !std::isfinite(v)) return;
+        if (v < minv[axis]) minv[axis] = v;
+        if (v > maxv[axis]) maxv[axis] = v;
+    }
+
+    // Expand the world AABB to include every numeric source position (top-level
+    // pos/isocenter, VERTICES.<i>.pos and VERTEX_GENERATOR pos/center).
+    void ExpandAabbForSources(ConfigManager* cfg, double minv[3], double maxv[3]) {
+        for (const auto& name : cfg->GetSubsections("SOURCE")) {
+            const std::string base = "SOURCE." + name + ".";
+            ExpandAabbCoord(cfg, base + "pos.x", 0, minv, maxv);
+            ExpandAabbCoord(cfg, base + "pos.y", 1, minv, maxv);
+            ExpandAabbCoord(cfg, base + "pos.z", 2, minv, maxv);
+            ExpandAabbCoord(cfg, base + "isocenter.x", 0, minv, maxv);
+            ExpandAabbCoord(cfg, base + "isocenter.y", 1, minv, maxv);
+            ExpandAabbCoord(cfg, base + "isocenter.z", 2, minv, maxv);
+            for (const auto& vi : cfg->GetSubsections(base + "VERTICES")) {
+                const std::string vp = base + "VERTICES." + vi + ".pos.";
+                ExpandAabbCoord(cfg, vp + "x", 0, minv, maxv);
+                ExpandAabbCoord(cfg, vp + "y", 1, minv, maxv);
+                ExpandAabbCoord(cfg, vp + "z", 2, minv, maxv);
+            }
+            ExpandAabbCoord(cfg, base + "VERTEX_GENERATOR.pos.x", 0, minv, maxv);
+            ExpandAabbCoord(cfg, base + "VERTEX_GENERATOR.pos.y", 1, minv, maxv);
+            ExpandAabbCoord(cfg, base + "VERTEX_GENERATOR.pos.z", 2, minv, maxv);
+            ExpandAabbCoord(cfg, base + "VERTEX_GENERATOR.center.x", 0, minv, maxv);
+            ExpandAabbCoord(cfg, base + "VERTEX_GENERATOR.center.y", 1, minv, maxv);
+            ExpandAabbCoord(cfg, base + "VERTEX_GENERATOR.center.z", 2, minv, maxv);
+        }
+    }
 } // anonymous namespace
 
 GeometryManager::GeometryManager()
@@ -257,6 +333,94 @@ void GeometryManager::LoadCustomGeometryFromConfig() {
 /// @return The DICOM voxel phantom container LV (nullptr if not built).
 G4LogicalVolume* GeometryManager::GetDicomPhantomLV() const {
     return fDicomPhantom ? fDicomPhantom->GetContainerLV() : nullptr;
+}
+
+/// @brief Read and prepare the DICOM CT for the phantom build.
+///
+/// Mirrors the CT preparation previously inlined in Construct(): the GUI
+/// transfer selection takes priority, otherwise GEOMETRY.DICOM is read from
+/// disk, tilted data is resampled, and the requested slice range is cropped.
+bool GeometryManager::PrepareDicomCT(CTSeries& out) {
+    auto* cfg = ConfigManager::Instance();
+
+    // Priority: GUI transfer selection (cropped) > config GEOMETRY.DICOM.
+    DicomService* dicomSvc = DicomService::Instance();
+    if (dicomSvc && dicomSvc->HasTransfer()) {
+        CTSeries ct;
+        if (dicomSvc->GetCroppedCT(ct) && ct.valid) {
+            out = std::move(ct);
+            DicomService::Instance()->UpdateWorldOffset(out);
+            return true;
+        }
+    }
+
+    if (!cfg->GetBool("GEOMETRY.DICOM.ENABLE", false)) return false;
+    const std::string ctDir = cfg->GetString("GEOMETRY.DICOM.CT_DIR", "");
+    if (ctDir.empty()) {
+        G4cerr << "[GeometryManager] GEOMETRY.DICOM.ENABLE set but CT_DIR is empty." << G4endl;
+        return false;
+    }
+
+#ifdef G4CARE_HAS_DICOM
+    DICOMReader dicom;
+    CTSeries ct;
+    if (!dicom.ReadCTSeries(ctDir, ct)) {
+        G4cerr << "[GeometryManager] Failed to read CT series from: " << ctDir << G4endl;
+        return false;
+    }
+
+    if (ct.tilted) {
+        if (cfg->GetBool("GEOMETRY.DICOM.STRICT_TILT", false)) {
+            G4cerr << "[GeometryManager] ERROR: gantry tilt " << ct.tiltAngleDeg
+                   << " deg (STRICT_TILT=true); skipping phantom." << G4endl;
+            return false;
+        } else if (cfg->GetBool("GEOMETRY.DICOM.RESAMPLE_TILT", true)) {
+            CTSeries resampled;
+            if (DICOMResampler::ResampleToAxisAligned(ct, resampled)) {
+                G4cout << "[GeometryManager] Resampled tilted CT to axis-aligned grid: "
+                       << resampled.nx << "x" << resampled.ny << "x" << resampled.nz << G4endl;
+                ct = std::move(resampled);
+            } else {
+                G4cerr << "[GeometryManager] Resampling failed; building raw grid." << G4endl;
+            }
+        } else {
+            G4cerr << "[GeometryManager] WARNING: gantry tilt " << ct.tiltAngleDeg
+                   << " deg; RESAMPLE_TILT=false (raw axis-aligned grid, inaccurate)." << G4endl;
+        }
+    }
+
+    // Crop to the configured slice range.
+    const int sf = cfg->GetInt("GEOMETRY.DICOM.SLICE_FROM", -1);
+    const int st = cfg->GetInt("GEOMETRY.DICOM.SLICE_TO", -1);
+    if (sf >= 0 || st >= 0) {
+        const int from = std::max(0, sf);
+        const int to = (st < 0) ? (ct.nz - 1) : std::min(st, ct.nz - 1);
+        if (from <= to && (from > 0 || to < ct.nz - 1)) {
+            const size_t plane = static_cast<size_t>(ct.nx) * ct.ny;
+            const size_t base = static_cast<size_t>(from) * plane;
+            const size_t n = plane * static_cast<size_t>(to - from + 1);
+            if (ct.floatData) {
+                std::vector<float> v(ct.floatValues.begin() + base, ct.floatValues.begin() + base + n);
+                ct.floatValues.swap(v);
+            } else {
+                std::vector<short> v(ct.hu.begin() + base, ct.hu.begin() + base + n);
+                ct.hu.swap(v);
+            }
+            ct.nz = to - from + 1;
+            ct.originMm[2] += from * ct.dzMm;
+            G4cout << "[GeometryManager] DICOM CT cropped to slices [" << from << ", " << to << "]." << G4endl;
+        }
+    }
+
+    if (ct.valid) {
+        out = std::move(ct);
+        DicomService::Instance()->UpdateWorldOffset(out);
+        return true;
+    }
+#else
+    G4cerr << "[GeometryManager] DICOM requested but G4CARE built without GDCM." << G4endl;
+#endif
+    return false;
 }
 
 /// @brief Load a custom G4VUserDetectorConstruction from a shared library.
@@ -404,7 +568,18 @@ G4VPhysicalVolume* GeometryManager::Construct() {
         // Place supplementary OBJECTS
         fObjectManager->PlaceObjects(logicWorld);
         FieldManager::Instance()->ApplyFields();
+        ApplyOverrides();
         return physWorld;
+    }
+
+    // Prepare the DICOM CT up front so the programmatic world can be sized (and
+    // centred) to contain it — the CT lives in absolute DICOM patient coords,
+    // which are often far from the origin.
+    CTSeries dicomCT;
+    const bool haveDicomCT = PrepareDicomCT(dicomCT);
+    if (haveDicomCT) {
+        const double* woff = DicomService::Instance()->GetWorldOffset();
+        for (int i = 0; i < 3; ++i) dicomCT.originMm[i] -= woff[i];
     }
 
     //==================================================================
@@ -451,9 +626,36 @@ G4VPhysicalVolume* GeometryManager::Construct() {
             worldMat = nist->FindOrBuildMaterial("G4_AIR");
         }
 
+        // When a DICOM phantom is present, enlarge the (origin-centred) world so
+        // it contains the phantom and the placed sources (plus a margin). Geant4
+        // requires the world to stay centred on the origin, so we size it around
+        // the origin to cover the absolute patient frame.
+        G4ThreeVector worldPos(0, 0, 0);
+        if (haveDicomCT && worldShape == "box") {
+            double minv[3], maxv[3];
+            if (PhantomAABB(dicomCT, minv, maxv)) {
+                ExpandAabbForSources(cfg, minv, maxv);
+                const double margin = 100.0;  // mm
+                double full[3] = {0.0, 0.0, 0.0};
+                for (int a = 0; a < 3; ++a) {
+                    const double half = std::max(std::fabs(minv[a]), std::fabs(maxv[a]));
+                    full[a] = 2.0 * half + 2.0 * margin;
+                }
+                worldDims = { std::to_string(full[0]) + "*mm",
+                              std::to_string(full[1]) + "*mm",
+                              std::to_string(full[2]) + "*mm" };
+                G4cout << "[GeometryManager] DICOM phantom AABB ("
+                       << minv[0] << "," << minv[1] << "," << minv[2] << ")..("
+                       << maxv[0] << "," << maxv[1] << "," << maxv[2]
+                       << ") mm -> world size "
+                       << full[0] << "/" << full[1] << "/" << full[2]
+                       << " mm (centred at origin)." << G4endl;
+            }
+        }
+
         G4VSolid* solidWorld = CreateSolid("World", worldShape, worldDims);
         logicWorld = new G4LogicalVolume(solidWorld, worldMat, "World");
-        physWorld = new G4PVPlacement(nullptr, G4ThreeVector(), logicWorld,
+        physWorld = new G4PVPlacement(nullptr, worldPos, logicWorld,
                                       "World", nullptr, false, 0);
         fWorldPV = physWorld;
 
@@ -496,7 +698,55 @@ G4VPhysicalVolume* GeometryManager::Construct() {
     fObjectManager->PlaceObjects(logicWorld);
 
     // ---- DICOM voxel phantom (CT -> HU -> material) ----
-    if (cfg->GetBool("GEOMETRY.DICOM.ENABLE", false)) {
+    // Priority: GUI transfer selection (cropped) > config GEOMETRY.DICOM.
+    bool builtFromTransfer = false;
+    {
+        DicomService* dicomSvc = DicomService::Instance();
+        if (dicomSvc && dicomSvc->HasTransfer()) {
+            CTSeries ct;
+            if (dicomSvc->GetCroppedCT(ct) && ct.valid) {
+                HUToMaterialMap huMap;
+                {
+                    const std::string densTable = cfg->GetString("GEOMETRY.DICOM.DENSITY_TABLE", "");
+                    if (!densTable.empty()) huMap.LoadDensityTable(densTable);
+                    const std::string huTable = cfg->GetString("GEOMETRY.DICOM.HU_TABLE", "");
+                    if (!huTable.empty()) huMap.LoadFromFile(huTable);
+                }
+                fDicomPhantom = std::make_unique<VoxelizedPhantom>();
+                // Volume material overrides: per-voxel label -> material.
+                {
+                    const auto& treq = dicomSvc->GetTransferRequest();
+                    std::vector<int> labels(static_cast<size_t>(ct.nx) * ct.ny * ct.nz, -1);
+                    std::vector<G4Material*> labelMaterials;
+                    for (const auto& vol : treq.volumes) {
+                        G4Material* mat = nullptr;
+                        if (!vol.material.empty()) {
+                            mat = G4NistManager::Instance()->FindOrBuildMaterial(vol.material);
+                        }
+                        labelMaterials.push_back(mat);
+                        const int lbl = static_cast<int>(labelMaterials.size()) - 1;
+                        for (size_t i = 0; i < vol.mask.size(); ++i) {
+                            if (vol.mask[i]) labels[i] = lbl;
+                        }
+                    }
+                    fDicomPhantom->SetMaterialOverrides(labels, labelMaterials);
+                }
+                const bool nested = cfg->GetString("GEOMETRY.DICOM.PARAMETERISATION", "regular") == "nested";
+                const bool ok = nested
+                    ? fDicomPhantom->BuildNested(ct, huMap, logicWorld, DicomAxes::LPS)
+                    : fDicomPhantom->Build(ct, huMap, logicWorld, DicomAxes::LPS);
+                if (ok) {
+                    builtFromTransfer = true;
+                    DoseScorer::Instance()->Configure(ct);
+                    G4cout << "[GeometryManager] Transfer phantom built: "
+                           << ct.nx << "x" << ct.ny << "x" << ct.nz << G4endl;
+                } else {
+                    G4cerr << "[GeometryManager] Transfer phantom build failed." << G4endl;
+                }
+            }
+        }
+    }
+    if (!builtFromTransfer && cfg->GetBool("GEOMETRY.DICOM.ENABLE", false)) {
         std::string ctDir = cfg->GetString("GEOMETRY.DICOM.CT_DIR", "");
         if (ctDir.empty()) {
             G4cerr << "[GeometryManager] GEOMETRY.DICOM.ENABLE set but CT_DIR is empty." << G4endl;
@@ -527,14 +777,79 @@ G4VPhysicalVolume* GeometryManager::Construct() {
                                << G4endl;
                     }
                 }
+                // Crop to the GUI transfer slice range.
+                int sf = cfg->GetInt("GEOMETRY.DICOM.SLICE_FROM", -1);
+                int st = cfg->GetInt("GEOMETRY.DICOM.SLICE_TO", -1);
+                if (sf >= 0 || st >= 0) {
+                    const int from = std::max(0, sf);
+                    const int to = (st < 0) ? (ct.nz - 1) : std::min(st, ct.nz - 1);
+                    if (from <= to && (from > 0 || to < ct.nz - 1)) {
+                        const size_t plane = static_cast<size_t>(ct.nx) * ct.ny;
+                        const size_t base = static_cast<size_t>(from) * plane;
+                        const size_t n = plane * static_cast<size_t>(to - from + 1);
+                        if (ct.floatData) { std::vector<float> v(ct.floatValues.begin() + base, ct.floatValues.begin() + base + n); ct.floatValues.swap(v); }
+                        else { std::vector<short> v(ct.hu.begin() + base, ct.hu.begin() + base + n); ct.hu.swap(v); }
+                        ct.nz = to - from + 1;
+                        ct.originMm[2] += from * ct.dzMm;
+                        G4cout << "[GeometryManager] DICOM CT cropped to slices [" << from << ", " << to << "]." << G4endl;
+                    }
+                }
                 if (ct.valid) {
                     const std::string axesStr = cfg->GetString("GEOMETRY.DICOM.AXES", "LPS");
                     const DicomAxes axes = (axesStr == "RAS") ? DicomAxes::RAS : DicomAxes::LPS;
+                    const bool skipEq = cfg->GetBool("GEOMETRY.DICOM.SKIP_EQUAL_MATERIALS", true);
                     HUToMaterialMap huMap;
+                    {
+                        const std::string densTable = cfg->GetString("GEOMETRY.DICOM.DENSITY_TABLE", "");
+                        if (!densTable.empty()) huMap.LoadDensityTable(densTable);
+                        const std::string huTable = cfg->GetString("GEOMETRY.DICOM.HU_TABLE", "");
+                        if (!huTable.empty()) huMap.LoadFromFile(huTable);
+                    }
                     fDicomPhantom = std::make_unique<VoxelizedPhantom>();
-                    if (!fDicomPhantom->Build(ct, huMap, logicWorld, axes)) {
+                    // Apply GUI volume masks (material overrides) from the masks file.
+                    const std::string masksFile = cfg->GetString("GEOMETRY.DICOM.MASKS_FILE", "");
+                    if (!masksFile.empty()) {
+                        std::ifstream mfs(masksFile);
+                        if (mfs) {
+                            try {
+                                nlohmann::json md;
+                                mfs >> md;
+                                std::vector<int> labels(static_cast<size_t>(ct.nx) * ct.ny * ct.nz, -1);
+                                std::vector<G4Material*> labelMaterials;
+                                if (md.contains("volumes") && md["volumes"].is_array()) {
+                                    for (const auto& v : md["volumes"]) {
+                                        G4Material* mat = nullptr;
+                                        const std::string matName = v.value("material", "");
+                                        if (!matName.empty()) mat = G4NistManager::Instance()->FindOrBuildMaterial(matName);
+                                        labelMaterials.push_back(mat);
+                                        const int lbl = static_cast<int>(labelMaterials.size()) - 1;
+                                        const size_t len = v.value("len", 0);
+                                        std::vector<uint8_t> mask(len, 0);
+                                        if (v.contains("rle") && v["rle"].is_array()) {
+                                            size_t idx = 0; int cur = 0;
+                                            for (const auto& r : v["rle"]) {
+                                                const int run = r.get<int>();
+                                                if (cur) for (size_t k = 0; k < static_cast<size_t>(run) && idx + k < len; ++k) mask[idx + k] = 1;
+                                                idx += static_cast<size_t>(run); cur = 1 - cur;
+                                            }
+                                        }
+                                        for (size_t i = 0; i < len && i < labels.size(); ++i) if (mask[i]) labels[i] = lbl;
+                                    }
+                                }
+                                fDicomPhantom->SetMaterialOverrides(labels, labelMaterials);
+                                G4cout << "[GeometryManager] " << labelMaterials.size() << " transfer volume masks applied." << G4endl;
+                            } catch (...) { /* ignore bad masks file */ }
+                        }
+                    }
+                    const bool nested = cfg->GetString("GEOMETRY.DICOM.PARAMETERISATION", "regular") == "nested";
+                    const bool ok = nested
+                        ? fDicomPhantom->BuildNested(ct, huMap, logicWorld, axes)
+                        : fDicomPhantom->Build(ct, huMap, logicWorld, axes, skipEq);
+                    if (!ok) {
                         G4cerr << "[GeometryManager] Phantom build failed (oblique acquisition?)."
                                << G4endl;
+                    } else {
+                        DoseScorer::Instance()->Configure(ct);
                     }
 
                     // RTSTRUCT -> organ labels (rasterised onto the CT grid).
@@ -555,7 +870,7 @@ G4VPhysicalVolume* GeometryManager::Construct() {
                         }
                     }
 
-                    // RTPLAN -> treatment beams (logged; auto source wiring).
+                    // RTPLAN -> treatment beams (logged; sources are imported via GUI).
                     const std::string rpFile = cfg->GetString("GEOMETRY.DICOM.RTPLAN_FILE", "");
                     if (!rpFile.empty()) {
                         RTPlan plan;
@@ -596,6 +911,7 @@ G4VPhysicalVolume* GeometryManager::Construct() {
     }
 
     FieldManager::Instance()->ApplyFields();
+    ApplyOverrides();
     return physWorld;
 }
 
@@ -651,6 +967,8 @@ void GeometryManager::ConstructSDandField() {
         if (sd) {
             int detId = detReg->RegisterDetector(sd, sdName, DetectorProperties());
             static_cast<SensitiveDetector*>(sd)->SetDetectorID(detId);
+            static_cast<SensitiveDetector*>(sd)->SetDoseScoring(true);
+            DoseScorer::Instance()->SetVoxelIndexEnabled(true);
             fDicomPhantom->GetVoxelLV()->SetSensitiveDetector(sd);
             G4cout << "[GeometryManager] SD 'PhantomVoxel_SD' attached to phantom voxels (detID="
                    << detId << ")." << G4endl;
@@ -882,4 +1200,61 @@ G4ThreeVector GeometryManager::GetVolumeCenter(const G4String& volName) const {
     G4cerr << "[GeometryManager] Volume '" << volName << "' not found for center calculation."
            << G4endl;
     return G4ThreeVector(0,0,0);
+}
+
+// ── GEOMETRY.OVERRIDES — placement overrides by physical volume name ──
+// Lets a GDML scene (immutable input) be tweaked from YAML without editing the
+// GDML file. Config:
+//   GEOMETRY:
+//     OVERRIDES:
+//       target:
+//         POSITION: ["10*cm", 0, 0]
+//         ROTATION: [0, 0, 45]     # Euler angles in degrees (x, y, z)
+void GeometryManager::ApplyOverrides() {
+    auto* cfg = ConfigManager::Instance();
+    auto names = cfg->GetSubsections("GEOMETRY.OVERRIDES");
+    if (names.empty()) return;
+
+    for (const auto& name : names) {
+        std::string baseKey = "GEOMETRY.OVERRIDES." + name + ".";
+        auto pos = cfg->GetDoubleVectorWithUnits(baseKey + "POSITION");
+        auto rot = cfg->GetDoubleVector(baseKey + "ROTATION");
+
+        G4PhysicalVolumeStore* pvStore = G4PhysicalVolumeStore::GetInstance();
+        G4VPhysicalVolume* pv = pvStore ? pvStore->GetVolume(name, false) : nullptr;
+        if (!pv) {
+            G4cerr << "[GeometryManager] OVERRIDES: physical volume '" << name
+                   << "' not found, skipping." << G4endl;
+            continue;
+        }
+        auto* placement = dynamic_cast<G4PVPlacement*>(pv);
+        if (!placement) {
+            G4cerr << "[GeometryManager] OVERRIDES: '" << name
+                   << "' is not a G4PVPlacement (replica/parameterised), skipping."
+                   << G4endl;
+            continue;
+        }
+
+        if (!pos.empty()) {
+            G4ThreeVector p(0.0, 0.0, 0.0);
+            if (pos.size() > 0) p.setX(pos[0]);
+            if (pos.size() > 1) p.setY(pos[1]);
+            if (pos.size() > 2) p.setZ(pos[2]);
+            placement->SetTranslation(p);
+            G4cout << "[GeometryManager] OVERRIDES: '" << name << "' position = ("
+                   << G4BestUnit(p.x(), "Length") << ", "
+                   << G4BestUnit(p.y(), "Length") << ", "
+                   << G4BestUnit(p.z(), "Length") << ")" << G4endl;
+        }
+
+        if (rot.size() >= 3) {
+            G4RotationMatrix* rm = new G4RotationMatrix();
+            rm->rotateX(rot[0] * CLHEP::deg);
+            rm->rotateY(rot[1] * CLHEP::deg);
+            rm->rotateZ(rot[2] * CLHEP::deg);
+            placement->SetRotation(rm);
+            G4cout << "[GeometryManager] OVERRIDES: '" << name << "' rotation = ("
+                   << rot[0] << ", " << rot[1] << ", " << rot[2] << ") deg" << G4endl;
+        }
+    }
 }

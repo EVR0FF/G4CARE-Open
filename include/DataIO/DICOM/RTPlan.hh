@@ -34,10 +34,13 @@ struct RTPlan {
         int number = 0;
         std::string name;
         std::string radiationType;          ///< "PHOTON", "ELECTRON", ...
+        double sadMm = 1000.0;              ///< Source-Axis Distance (300A,00B4), mm.
         std::vector<ControlPoint> controlPoints;
     };
 
     std::vector<Beam> beams;
+    std::string label;                 ///< RT Plan Label (300A,0002).
+    double prescriptionDoseCGy = 0.0;  ///< Target prescription dose (cGy) from DoseReferenceSequence.
     bool valid = false;
 
     /// @brief Beam direction (unit vector) from gantry/couch angles.
@@ -54,6 +57,15 @@ struct RTPlan {
         dir[0] = bx * std::cos(c) - by * std::sin(c);
         dir[1] = bx * std::sin(c) + by * std::cos(c);
         dir[2] = bz;
+    }
+
+    /// @brief Map a Geant4 particle name to a DICOM RT Radiation Type (300A,00C6).
+    static std::string RadiationTypeFromParticle(const std::string& particle) {
+        if (particle == "gamma") return "PHOTON";
+        if (particle == "e-" || particle == "e+") return "ELECTRON";
+        if (particle == "proton") return "PROTON";
+        if (particle == "neutron") return "NEUTRON";
+        return "ION";
     }
 };
 

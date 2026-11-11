@@ -123,6 +123,11 @@ namespace ParticleUtils {
             ParticleGunSource::ParticleDesc& part = result[idx];
 
             part.type = cfg->GetString(basePath + "." + entry.first + ".particle", "");
+            if (part.type.empty()) {
+                // Backward compatibility: early GUI versions wrote `type` instead
+                // of `particle` for per-particle definitions.
+                part.type = cfg->GetString(basePath + "." + entry.first + ".type", "");
+            }
             part.iaeaExpr = ExpressionEvaluator::PrecompiledExpr(
                 cfg->GetString(basePath + "." + entry.first + ".iaea_code", ""), allVarNames, eval);
             part.energyExpr = ExpressionEvaluator::PrecompiledExpr(
@@ -231,49 +236,58 @@ namespace ParticleUtils {
         // Option (a): kinetic energy + direction
         if (pdesc.fastEnergy.comp) {
             energy = pdesc.fastEnergy.Evaluate(event_id, v_i, p_i);
-            G4ThreeVector dir(0,0,1);
 
+            // Beam axis from the user `direction` (cartesian or theta/phi),
+            // defaulting to +z when absent. `direction_mode` then samples around
+            // that axis: fixed = exactly the axis, cone/gauss = spread around it,
+            // isotropic = ignores the axis entirely.
+            G4ThreeVector baseDir(0, 0, 1);
             if (pdesc.fastDirX.comp || pdesc.fastDirY.comp || pdesc.fastDirZ.comp) {
                 double dx = pdesc.fastDirX.Evaluate(event_id, v_i, p_i);
                 double dy = pdesc.fastDirY.Evaluate(event_id, v_i, p_i);
                 double dz = pdesc.fastDirZ.Evaluate(event_id, v_i, p_i);
-                dir = G4ThreeVector(dx, dy, dz);
-                double mag = dir.mag();
-                if (mag > 0) dir /= mag;
-            }
-            else if (pdesc.fastDirTheta.comp || pdesc.fastDirPhi.comp) {
+                baseDir = G4ThreeVector(dx, dy, dz);
+                double mag = baseDir.mag();
+                if (mag > 0.0) baseDir /= mag;
+            } else if (pdesc.fastDirTheta.comp || pdesc.fastDirPhi.comp) {
                 double theta = pdesc.fastDirTheta.Evaluate(event_id, v_i, p_i);
                 double phi   = pdesc.fastDirPhi.Evaluate(event_id, v_i, p_i);
-                dir = G4ThreeVector(std::sin(theta)*std::cos(phi),
-                                    std::sin(theta)*std::sin(phi),
-                                    std::cos(theta));
+                baseDir = G4ThreeVector(std::sin(theta) * std::cos(phi),
+                                        std::sin(theta) * std::sin(phi),
+                                        std::cos(theta));
             }
-            else if (!pdesc.dirMode.empty()) {
-                G4ThreeVector baseDir(0,0,1);
-                if (pdesc.dirMode == "fixed") {
-                    // dir remains (0,0,1)
-                } else if (pdesc.dirMode == "isotropic") {
-                    dir = G4RandomDirection();
-                } else if (pdesc.dirMode == "cone") {
-                    double coneAngle = pdesc.coneAngle;
-                    double cosThetaMax = std::cos(coneAngle);
-                    double zeta = G4UniformRand();
-                    double cosTheta = 1.0 - zeta * (1.0 - cosThetaMax);
-                    double sinTheta = std::sqrt(1.0 - cosTheta * cosTheta);
-                    double phi = 2.0 * M_PI * G4UniformRand();
-                    dir = G4ThreeVector(sinTheta * std::cos(phi),
-                                        sinTheta * std::sin(phi),
-                                        cosTheta);
-                    dir = RotateToBase(dir, baseDir);
-                } else if (pdesc.dirMode == "gauss") {
-                    double dTheta = (pdesc.sigmaTheta > 0) ? G4RandGauss::shoot(0.0, pdesc.sigmaTheta) : 0.0;
-                    double dPhi   = (pdesc.sigmaPhi > 0) ? G4RandGauss::shoot(0.0, pdesc.sigmaPhi) : 0.0;
-                    dir = G4ThreeVector(std::sin(dTheta) * std::cos(dPhi),
-                                        std::sin(dTheta) * std::sin(dPhi),
-                                        std::cos(dTheta));
-                    dir = RotateToBase(dir, baseDir);
-                }
+
+            G4ThreeVector dir = baseDir;
+            // Infer the sampling mode from the angle parameters when
+            // direction_mode is not set explicitly (the GUI and hand-written
+            // YAML often specify cone_angle/sigma_* without direction_mode).
+            std::string dirMode = pdesc.dirMode;
+            if (dirMode.empty()) {
+                if (pdesc.coneAngle > 0.0) dirMode = "cone";
+                else if (pdesc.sigmaTheta > 0.0 || pdesc.sigmaPhi > 0.0) dirMode = "gauss";
             }
+            if (dirMode == "isotropic") {
+                dir = G4RandomDirection();
+            } else if (dirMode == "cone") {
+                double coneAngle = pdesc.coneAngle;
+                double cosThetaMax = std::cos(coneAngle);
+                double zeta = G4UniformRand();
+                double cosTheta = 1.0 - zeta * (1.0 - cosThetaMax);
+                double sinTheta = std::sqrt(1.0 - cosTheta * cosTheta);
+                double phi = 2.0 * M_PI * G4UniformRand();
+                dir = G4ThreeVector(sinTheta * std::cos(phi),
+                                    sinTheta * std::sin(phi),
+                                    cosTheta);
+                dir = RotateToBase(dir, baseDir);
+            } else if (dirMode == "gauss") {
+                double dTheta = (pdesc.sigmaTheta > 0) ? G4RandGauss::shoot(0.0, pdesc.sigmaTheta) : 0.0;
+                double dPhi   = (pdesc.sigmaPhi > 0) ? G4RandGauss::shoot(0.0, pdesc.sigmaPhi) : 0.0;
+                dir = G4ThreeVector(std::sin(dTheta) * std::cos(dPhi),
+                                    std::sin(dTheta) * std::sin(dPhi),
+                                    std::cos(dTheta));
+                dir = RotateToBase(dir, baseDir);
+            }
+            // "fixed" or empty dirMode -> dir stays baseDir.
 
             G4double totalE = energy + mass;
             G4double p = (totalE > mass) ? std::sqrt(totalE*totalE - mass*mass) : 0.0;

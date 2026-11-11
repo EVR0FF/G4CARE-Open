@@ -1,4 +1,14 @@
-#!/usr/bin/env python3
+#==============================================================================
+# G4CARE - server.py — Cloud converter server
+#
+# Cloud converter server
+#
+# @author I. I. Everstov  @author V. F. Myshkin (Scientific Supervisor)
+# @date 2026-11-11  @version 0.9.3
+# @copyright Copyright (c) 2026 G4CARE Developers
+# @license SPDX-License-Identifier: Apache-2.0
+#==============================================================================
+
 """Tiny HTTP wrapper around the `gdml2obj` CLI (GDML -> OBJ mesh)."""
 import http.server
 import os

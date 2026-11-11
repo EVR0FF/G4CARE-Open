@@ -1,3 +1,14 @@
+//==============================================================================
+// G4CARE - api.ts — Cloud frontend: API client
+//
+// Cloud frontend: API client
+//
+// @author I. I. Everstov  @author V. F. Myshkin (Scientific Supervisor)
+// @date 2026-11-11  @version 0.9.3
+// @copyright Copyright (c) 2026 G4CARE Developers
+// @license SPDX-License-Identifier: Apache-2.0
+//==============================================================================
+
 import type { ArtifactRecord, SearchFilter } from './types';
 
 const BASE = import.meta.env.VITE_API_URL ?? '';

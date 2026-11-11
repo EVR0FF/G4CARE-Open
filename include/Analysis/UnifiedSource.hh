@@ -42,16 +42,18 @@
 #include "G4VUserRegionInformation.hh"
 #include "G4SystemOfUnits.hh"
 #include "Digit.hh"
+#include "Hit.hh"
 
 class UnifiedSource {
 public:
-    enum class Type { Primary, Secondary, Hit, Digit };
+    enum class Type { Primary, Secondary, Hit, SDHit, Digit };
 
     const Digit* GetDigit() const { return (fType == Type::Digit) ? fDigit : nullptr; }
+    const Hit* GetSDHit() const { return (fType == Type::SDHit) ? fHit : nullptr; }
 
     // Constructors
-    UnifiedSource(const G4PrimaryVertex* v, const G4PrimaryParticle* p)
-        : fType(Type::Primary), fVertex(v), fParticle(p), fTrack(nullptr), fStep(nullptr) {}
+    UnifiedSource(const G4PrimaryVertex* v, const G4PrimaryParticle* p, std::string sourceName = "")
+        : fType(Type::Primary), fVertex(v), fParticle(p), fTrack(nullptr), fStep(nullptr), fSourceName(sourceName) {}
 
     explicit UnifiedSource(const G4Track* t)
         : fType(Type::Secondary), fVertex(nullptr), fParticle(nullptr), fTrack(t), fStep(nullptr) {}
@@ -62,19 +64,25 @@ public:
     explicit UnifiedSource(const Digit* d)
         : fType(Type::Digit), fDigit(d), fVertex(nullptr), fParticle(nullptr), fTrack(nullptr), fStep(nullptr) {}
 
+    explicit UnifiedSource(const Hit* h)
+        : fType(Type::SDHit), fDigit(nullptr), fHit(h), fVertex(nullptr), fParticle(nullptr), fTrack(nullptr), fStep(nullptr) {}
+
     [[nodiscard]] Type GetType() const noexcept { return fType; }
+    [[nodiscard]] const std::string& GetSourceName() const noexcept { return fSourceName; }
 
     // ========== Basic identifiers ==========
     [[nodiscard]] int GetTrackID() const noexcept {
         if (fType == Type::Primary) return 0;
         if (fType == Type::Secondary) return fTrack->GetTrackID();
         if (fType == Type::Digit) return fDigit->GetTrackID();
+        if (fType == Type::SDHit) return fHit->GetTrackID();
         return fStep->GetTrack()->GetTrackID();
     }
 
     [[nodiscard]] int GetParentID() const noexcept {
         if (fType == Type::Primary) return 0;
         if (fType == Type::Secondary) return fTrack->GetParentID();
+        if (fType == Type::SDHit) return 0;
         return fStep->GetTrack()->GetParentID();
     }
 
@@ -90,6 +98,7 @@ public:
             return G4ParticleTable::GetParticleTable()->FindParticle(fParticle->GetPDGcode());
         }
         if (fType == Type::Secondary) return fTrack->GetParticleDefinition();
+        if (fType == Type::SDHit) return nullptr;
         return fStep->GetTrack()->GetParticleDefinition();
     }
 
@@ -114,6 +123,7 @@ public:
         if (fType == Type::Primary) return fParticle->GetKineticEnergy();
         if (fType == Type::Secondary) return fTrack->GetKineticEnergy();
         if (fType == Type::Digit) return fDigit->GetEnergy();
+        if (fType == Type::SDHit) return 0.0;
         return fStep->GetPostStepPoint()->GetKineticEnergy();
     }
 
@@ -127,6 +137,7 @@ public:
     [[nodiscard]] G4ThreeVector GetMomentum() const noexcept {
         if (fType == Type::Primary) return G4ThreeVector(fParticle->GetPx(), fParticle->GetPy(), fParticle->GetPz());
         if (fType == Type::Secondary) return fTrack->GetMomentum();
+        if (fType == Type::SDHit) return G4ThreeVector();
         return fStep->GetPostStepPoint()->GetMomentum();
     }
 
@@ -154,6 +165,7 @@ public:
         if (fType == Type::Primary) return fVertex->GetPosition();
         if (fType == Type::Secondary) return fTrack->GetPosition();
         if (fType == Type::Digit) return fDigit->GetPosition();
+        if (fType == Type::SDHit) return fHit->GetPosition();
         return fStep->GetPostStepPoint()->GetPosition();
     }
 
@@ -161,24 +173,28 @@ public:
         if (fType == Type::Primary) return fVertex->GetT0();
         if (fType == Type::Secondary) return fTrack->GetGlobalTime();
         if (fType == Type::Digit) return fDigit->GetTime();
+        if (fType == Type::SDHit) return fHit->GetTime();
         return fStep->GetPostStepPoint()->GetGlobalTime();
     }
 
     [[nodiscard]] double GetLocalTime() const noexcept {
         if (fType == Type::Primary) return 0.0;
         if (fType == Type::Secondary) return fTrack->GetLocalTime();
+        if (fType == Type::SDHit) return 0.0;
         return fStep->GetTrack()->GetLocalTime();
     }
 
     [[nodiscard]] double GetProperTime() const noexcept {
         if (fType == Type::Primary) return fParticle->GetProperTime();
         if (fType == Type::Secondary) return fTrack->GetProperTime();
+        if (fType == Type::SDHit) return 0.0;
         return fStep->GetTrack()->GetProperTime();
     }
 
     [[nodiscard]] double GetWeight() const noexcept {
         if (fType == Type::Primary) return fParticle->GetWeight();
         if (fType == Type::Secondary) return fTrack->GetWeight();
+        if (fType == Type::SDHit) return 0.0;
         return fStep->GetTrack()->GetWeight();
     }
 
@@ -393,6 +409,7 @@ public:
     [[nodiscard]] const G4VPhysicalVolume* GetPhysicalVolume() const noexcept {
         if (fType == Type::Primary) return nullptr;
         if (fType == Type::Secondary) return fTrack->GetVolume();
+        if (fType == Type::SDHit) return nullptr;
         return fStep->GetPreStepPoint()->GetPhysicalVolume();
     }
 
@@ -458,10 +475,12 @@ public:
 private:
     Type fType;
     const Digit* fDigit;
+    const Hit* fHit = nullptr;
     const G4PrimaryVertex* fVertex;
     const G4PrimaryParticle* fParticle;
     const G4Track* fTrack;
     const G4Step* fStep;
+    std::string fSourceName;
 };
 
 #endif // UNIFIED_SOURCE_HH

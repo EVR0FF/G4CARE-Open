@@ -33,6 +33,10 @@ __pycache__/
 .vscode/*
 !.vscode/schemas/
 
+# Node / Electron
+node_modules/
+dist/
+
 # Misc
 tmp/
 History
@@ -40,3 +44,7 @@ History
 # Compiled test helpers (extensionless ELF binaries)
 examples/tests/compare_tes
 examples/tests/compare_tes_primary
+
+# Large medical-image datasets (DICOM / NRRD) — example data, not source
+*.dcm
+*.nrrd

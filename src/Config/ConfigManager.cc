@@ -206,6 +206,53 @@ bool ConfigManager::LoadConfig(const std::string& filename) {
 
         ExtractAllData();
 
+        // Parse OUTPUT now while fRootNode is valid (before any lazy access).
+        {
+            YAML::Node out = fRootNode["OUTPUT"];
+            if (out && out.IsMap()) {
+                if (out["file"] && out["file"].IsScalar())
+                    fOutputSpec.file = out["file"].as<std::string>();
+                if (out["format"] && out["format"].IsScalar())
+                    fOutputSpec.format = out["format"].as<std::string>();
+                if (out["compression"] && out["compression"].IsMap()) {
+                    const auto& c = out["compression"];
+                    if (c["algorithm"] && c["algorithm"].IsScalar())
+                        fOutputSpec.compressionAlgorithm = c["algorithm"].as<std::string>();
+                    if (c["level"] && c["level"].IsScalar())
+                        fOutputSpec.compressionLevel = c["level"].as<int>();
+                }
+                if (out["cluster_size_mb"] && out["cluster_size_mb"].IsScalar())
+                    fOutputSpec.clusterSizeMb = out["cluster_size_mb"].as<int>();
+                if (out["page_size_kb"] && out["page_size_kb"].IsScalar())
+                    fOutputSpec.pageSizeKb = out["page_size_kb"].as<int>();
+                if (out["streams"] && out["streams"].IsSequence()) {
+                    for (const auto& s : out["streams"]) {
+                        if (!s || !s.IsMap()) continue;
+                        OutputStreamSpec os;
+                        if (s["name"] && s["name"].IsScalar()) os.name = s["name"].as<std::string>();
+                        if (s["level"] && s["level"].IsScalar()) os.level = s["level"].as<std::string>();
+                        if (s["filter"] && s["filter"].IsScalar()) {
+                            os.filter = s["filter"].as<std::string>();
+                        } else if (s["filter"] && s["filter"].IsMap()) {
+                            if (s["filter"]["volumes"] && s["filter"]["volumes"].IsSequence())
+                                for (const auto& v : s["filter"]["volumes"])
+                                    if (v && v.IsScalar()) os.filterVolumes.push_back(v.as<std::string>());
+                            if (s["filter"]["condition"] && s["filter"]["condition"].IsScalar())
+                                os.filterCondition = s["filter"]["condition"].as<std::string>();
+                        }
+                        if (s["columns"] && s["columns"].IsSequence())
+                            for (const auto& c : s["columns"])
+                                if (c && c.IsScalar()) os.columns.push_back(c.as<std::string>());
+                        if (!os.name.empty()) fOutputSpec.streams.push_back(std::move(os));
+                    }
+                }
+            }
+        }
+        ExpressionEvaluator::SetGlobalConstants(fExpressionVariables);
+        for (const auto& [fname, fab] : fUserFunctions) {
+            ExpressionEvaluator::RegisterGlobalFunction(fname, fab.first, fab.second);
+        }
+
         fIsLoaded = true;
         G4cout << "ConfigManager: Configuration loaded from " << filename
                << " (" << fFlatScalars.size() << " scalars, "
@@ -264,6 +311,13 @@ void ConfigManager::ExtractAllData() {
         ExtractScripts();
     } catch (const YAML::Exception& e) {
         G4cerr << "ConfigManager: ExtractScripts failed: " << e.what() << G4endl;
+    }
+
+    try {
+        // 6. Dedicated SCRIPT section (variables / functions / scripts)
+        ParseScriptSection();
+    } catch (const YAML::Exception& e) {
+        G4cerr << "ConfigManager: ParseScriptSection failed: " << e.what() << G4endl;
     }
 }
 
@@ -377,61 +431,11 @@ void ConfigManager::ExtractScripts() {
     std::vector<std::string> keysToRemove;
 
     for (const auto& [key, rawValue] : fFlatScalars) {
+        // The dedicated SCRIPT section is handled by ParseScriptSection (leaf
+        // names); skip its flattened keys to avoid duplicate dot-path entries.
+        if (key == "SCRIPT" || key.rfind("SCRIPT.", 0) == 0) continue;
         std::string val = Trim(rawValue);
         if (val.empty()) continue;
-
-        // ── Variable: ":=" prefix ──
-        if (val.size() >= 2 && val[0] == ':' && val[1] == '=') {
-            std::string numStr = Trim(val.substr(2));
-            double dval = 0.0;
-            try { dval = std::stod(numStr); }
-            catch (...) {
-                // Try as expression
-                dval = 0.0;
-            }
-            fExpressionVariables[key] = dval;
-            keysToRemove.push_back(key);
-            G4cout << "ConfigManager: SCRIPT variable '" << key << "' = " << dval << G4endl;
-            continue;
-        }
-
-        // ── Function: "=(a,b,c) body" ──
-        if (val.size() >= 3 && val[0] == '=' && val[1] == '(') {
-            size_t parenClose = val.find(')');
-            if (parenClose != std::string::npos) {
-                std::string argsStr = val.substr(2, parenClose - 2);
-                std::string afterParen = Trim(val.substr(parenClose + 1));
-                // Distinguish function from expression:
-                // Function: "=(a,b) body" — args are simple identifiers, body is non-empty
-                // Expression: "=(edep * 100) / G_OH" — args contain operators, or afterParen is empty
-                bool looksLikeFunction = true;
-                for (char c : argsStr) {
-                    if (c == '+' || c == '-' || c == '*' || c == '/' || c == '?' || c == ':'
-                        || c == '>' || c == '<' || c == '=' || c == '!' || c == '&' || c == '|') {
-                        looksLikeFunction = false;
-                        break;
-                    }
-                }
-                if (looksLikeFunction && !afterParen.empty()) {
-                    std::vector<std::string> args;
-                    std::stringstream ss(argsStr);
-                    std::string arg;
-                    while (std::getline(ss, arg, ',')) {
-                        std::string a = Trim(arg);
-                        if (!a.empty()) args.push_back(a);
-                    }
-                    fUserFunctions[key] = {args, afterParen};
-                    keysToRemove.push_back(key);
-                    G4cout << "ConfigManager: SCRIPT function '" << key << "(";
-                    for (size_t i = 0; i < args.size(); ++i) {
-                        if (i > 0) G4cout << ",";
-                        G4cout << args[i];
-                    }
-                    G4cout << ")'" << G4endl;
-                    continue;
-                }
-            }
-        }
 
         // ── Expression: "=expr" ──
         if (val.size() >= 2 && val[0] == '=') {
@@ -448,10 +452,8 @@ void ConfigManager::ExtractScripts() {
         fFlatScalars.erase(k);
     }
 
-    G4cout << "ConfigManager: Extracted " << fExpressionVariables.size()
-           << " variables, " << fUserFunctions.size()
-           << " functions, " << fExpressionDefinitions.size()
-           << " expressions from SCRIPT declarations." << G4endl;
+    G4cout << "ConfigManager: Extracted " << fExpressionDefinitions.size()
+           << " expressions from flat declarations." << G4endl;
 }
 
 /// @brief Extract vector data (sequences of scalars) from YAML
@@ -575,7 +577,7 @@ double ConfigManager::GetDouble(const std::string& key, double defaultVal) const
         auto it = fTLS.doubleCache.find(key);
         if (it != fTLS.doubleCache.end()) return it->second;
     }
-    // Check runtime variables first (for EXPRS → GEOMETRY/SOURCE)
+    // Check runtime variables first (for SCRIPT.scripts → GEOMETRY/SOURCE)
     {
         auto rit = s_runtimeVars.find(key);
         if (rit != s_runtimeVars.end()) return rit->second;
@@ -867,6 +869,12 @@ YAML::Node ConfigManager::GetNode(const std::string& key) const {
     return current;
 }
 
+/// @brief Parse the OUTPUT section into a structured spec.
+/// @return OutputSpec with file/format and stream definitions.
+OutputSpec ConfigManager::GetOutputSpec() const {
+    return fOutputSpec;
+}
+
 // ======================================================================
 //  Public Utility Methods (Backward Compatibility)
 // ======================================================================
@@ -894,4 +902,79 @@ std::vector<double> ConfigManager::GetDoubleVectorWithUnits(const std::string& k
         result.push_back(ParseValueWithUnit(s, 0.0));
     }
     return result;
+}
+
+/// @brief Parse the dedicated SCRIPT section into the same caches (leaf names).
+///
+/// Reads SCRIPT.variables / SCRIPT.functions from the YAML tree and stores
+/// them under their leaf names (no section prefix), complementing the flat
+/// := / =( / = declarations handled by ExtractScripts.  SCRIPT.scripts is
+/// read by ScriptsManager directly from the YAML file.
+void ConfigManager::ParseScriptSection() {
+    if (!fRootNode["SCRIPT"] || !fRootNode["SCRIPT"].IsMap()) return;
+    const YAML::Node script = fRootNode["SCRIPT"];
+
+    // Variables: leaf name -> constant (numeric) or expression definition.
+    if (script["variables"] && script["variables"].IsMap()) {
+        for (const auto& kv : script["variables"]) {
+            const std::string name = kv.first.as<std::string>();
+            std::string val = Trim(kv.second.as<std::string>());
+            if (val.empty()) continue;
+
+            if (val.size() >= 2 && val[0] == ':' && val[1] == '=') {
+                // ":=" -> constant variable (alias of the flat syntax).
+                val = Trim(val.substr(2));
+                double d = 0.0;
+                try { d = std::stod(val); } catch (...) { d = 0.0; }
+                fExpressionVariables[name] = d;
+                G4cout << "ConfigManager: SCRIPT variable '" << name << "' = " << d << G4endl;
+            } else if (val[0] == '=') {
+                // "=expr" -> expression definition.
+                fExpressionDefinitions[name] = Trim(val.substr(1));
+                G4cout << "ConfigManager: SCRIPT expression '" << name << "' = " << Trim(val.substr(1)) << G4endl;
+            } else {
+                // Plain value: number -> constant, else -> expression definition.
+                bool numeric = false;
+                double d = 0.0;
+                try {
+                    std::size_t idx = 0;
+                    d = std::stod(val, &idx);
+                    numeric = (idx == val.size());
+                } catch (...) { numeric = false; }
+                if (numeric) {
+                    fExpressionVariables[name] = d;
+                    G4cout << "ConfigManager: SCRIPT variable '" << name << "' = " << d << G4endl;
+                } else {
+                    fExpressionDefinitions[name] = val;
+                    G4cout << "ConfigManager: SCRIPT expression '" << name << "' = " << val << G4endl;
+                }
+            }
+        }
+    }
+
+    // Functions: leaf name -> "=(args) body".
+    if (script["functions"] && script["functions"].IsMap()) {
+        for (const auto& kv : script["functions"]) {
+            const std::string name = kv.first.as<std::string>();
+            std::string val = Trim(kv.second.as<std::string>());
+            if (val.size() >= 2 && val[0] == ':' && val[1] == '=') val = Trim(val.substr(2));
+            if (val.size() < 3 || val[0] != '=' || val[1] != '(') {
+                G4cerr << "ConfigManager: SCRIPT function '" << name << "' must be '=(args) body'." << G4endl;
+                continue;
+            }
+            const std::size_t parenClose = val.find(')');
+            if (parenClose == std::string::npos) continue;
+            const std::string argsStr = Trim(val.substr(2, parenClose - 2));
+            const std::string body = Trim(val.substr(parenClose + 1));
+            std::vector<std::string> args;
+            std::stringstream ss(argsStr);
+            std::string a;
+            while (std::getline(ss, a, ',')) {
+                a = Trim(a);
+                if (!a.empty()) args.push_back(a);
+            }
+            fUserFunctions[name] = {args, body};
+            G4cout << "ConfigManager: SCRIPT function '" << name << "'(" << argsStr << ")" << G4endl;
+        }
+    }
 }

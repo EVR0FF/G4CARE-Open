@@ -46,10 +46,15 @@
 #include "ExpressionEvaluator.hh"
 #include "MixtureSource.hh"
 #include "ActivationSource.hh"
+#include "TableSource.hh"
+#include "G4PrimaryVertex.hh"
+#include "G4PrimaryParticle.hh"
 
 #include <map>
 #include <algorithm>
 #include <cctype>
+
+PrimaryGeneratorAction* PrimaryGeneratorAction::fgInstance = nullptr;
 
 /// @brief Construct the primary generator action and create all sources.
 ///
@@ -63,6 +68,7 @@
 /// SourceManager.
 PrimaryGeneratorAction::PrimaryGeneratorAction(ObjectManager* objMgr) {
     fSourceManager = std::make_unique<SourceManager>();
+    fgInstance = this;
 
     auto* cfg = ConfigManager::Instance();
     std::vector<std::string> dataSections = cfg->GetSubsections("DATA");
@@ -113,15 +119,18 @@ PrimaryGeneratorAction::PrimaryGeneratorAction(ObjectManager* objMgr) {
     for (const auto& srcId : srcIds) {
         std::string baseKey = "SOURCE." + srcId + ".";
         std::string type = cfg->GetString(baseKey + "type", "");
+        std::string typeLower = type;
+        std::transform(typeLower.begin(), typeLower.end(), typeLower.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
         double weight = cfg->GetDouble(baseKey + "weight", 1.0);
         std::unique_ptr<Source> source;
         
-        if (type == "mixture") {
+        if (typeLower == "mixture") {
             mixtureIds.push_back(srcId);
             continue;
         }
                 
-        if (type == "radioactive" || type == "Radioactive") {
+        if (typeLower == "radioactive") {
             source = std::make_unique<RadioactiveSource>("SOURCE." + srcId, objMgr);
             source->SetWeight(weight);
             fSourceManager->AddSource(std::move(source), weight, srcId);
@@ -129,7 +138,7 @@ PrimaryGeneratorAction::PrimaryGeneratorAction(ObjectManager* objMgr) {
             continue;
         }
 
-        if (type == "activation") {
+        if (typeLower == "activation") {
             auto actSource = std::make_unique<ActivationSource>("SOURCE." + srcId);
             // Initialize global data before moving the source
             std::string dataAlias = cfg->GetString("SOURCE." + srcId + ".data", "");
@@ -141,7 +150,7 @@ PrimaryGeneratorAction::PrimaryGeneratorAction(ObjectManager* objMgr) {
             G4cout << "PrimaryGeneratorAction: added activation source '" << srcId << "'" << G4endl;
         }
 
-        else if (type == "GPS") {
+        else if (typeLower == "gps") {
             std::string macroFile = cfg->GetString(baseKey + "macro", "");
             if (!macroFile.empty()) {
                 source = std::make_unique<GPSSource>(macroFile);
@@ -151,8 +160,12 @@ PrimaryGeneratorAction::PrimaryGeneratorAction(ObjectManager* objMgr) {
             }
         }
 
-        else if (type == "particleGun") {
+        else if (typeLower == "particlegun") {
             source = std::make_unique<ParticleGunSource>("SOURCE." + srcId);
+        }
+
+        else if (typeLower == "table") {
+            source = std::make_unique<TableSource>("SOURCE." + srcId);
         }
 
         else {
@@ -219,4 +232,46 @@ PrimaryGeneratorAction::~PrimaryGeneratorAction() = default;
 /// @param event Current Geant4 event to populate with primary tracks.
 void PrimaryGeneratorAction::GeneratePrimaries(G4Event* event) {
     fSourceManager->GeneratePrimaries(event);
+}
+
+/// @brief Sample N primaries from one source (GUI source preview).
+///
+/// Calls the source's GeneratePrimaries into a throwaway G4Event and extracts
+/// position / direction / energy / particle / time / weight for every primary.
+/// Used by the JSON-RPC "sampleSource" method so the geometry viewer can draw
+/// the real sampled distribution (ExprTK expressions, GPS, radioactive included).
+std::vector<PrimaryGeneratorAction::SampledPrimary>
+PrimaryGeneratorAction::SampleSource(const std::string& name, int n, bool* found) {
+    std::vector<SampledPrimary> out;
+    if (found) *found = false;
+    if (n <= 0) return out;
+    Source* src = fSourceManager->GetSourceByName(name);
+    if (!src) return out;
+    if (found) *found = true;
+
+    out.reserve(static_cast<size_t>(n) * 4);
+    for (int i = 0; i < n; ++i) {
+        G4Event evt(i);
+        src->GeneratePrimaries(&evt);
+        for (int v = 0; v < evt.GetNumberOfPrimaryVertex(); ++v) {
+            G4PrimaryVertex* vtx = evt.GetPrimaryVertex(v);
+            G4ThreeVector pos = vtx->GetPosition();
+            double t0 = vtx->GetT0();
+            for (int p = 0; p < vtx->GetNumberOfParticle(); ++p) {
+                G4PrimaryParticle* part = vtx->GetPrimary(p);
+                G4ThreeVector mom = part->GetMomentumDirection();
+                SampledPrimary sp;
+                sp.x = pos.x(); sp.y = pos.y(); sp.z = pos.z();
+                sp.dx = mom.x(); sp.dy = mom.y(); sp.dz = mom.z();
+                sp.energy = part->GetKineticEnergy();
+                sp.time = t0;
+                sp.weight = part->GetWeight();
+                if (part->GetParticleDefinition()) {
+                    sp.particle = part->GetParticleDefinition()->GetParticleName();
+                }
+                out.push_back(sp);
+            }
+        }
+    }
+    return out;
 }

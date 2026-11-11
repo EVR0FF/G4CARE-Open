@@ -46,9 +46,9 @@ bool DICOMRasterizer::Rasterize(const CTSeries& ct, const RTStruct& rt,
     const double row[3] = {ct.direction[0], ct.direction[1], ct.direction[2]};
     const double col[3] = {ct.direction[3], ct.direction[4], ct.direction[5]};
     const double nrm[3] = {
-        row[1] * col[2] - row[2] * col[1],
-        row[2] * col[0] - row[0] * col[2],
-        row[0] * col[1] - row[1] * col[0]
+        col[1] * row[2] - col[2] * row[1],
+        col[2] * row[0] - col[0] * row[2],
+        col[0] * row[1] - col[1] * row[0]
     };
     const double nn = std::sqrt(nrm[0] * nrm[0] + nrm[1] * nrm[1] + nrm[2] * nrm[2]);
     if (nn <= 0.0) return false;

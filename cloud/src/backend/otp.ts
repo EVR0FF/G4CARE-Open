@@ -1,5 +1,12 @@
 //==============================================================================
-// G4CARE cloud — one-time verification codes (OTP).
+// G4CARE - otp.ts — Cloud backend: one-time passwords
+//
+// Cloud backend: one-time passwords
+//
+// @author I. I. Everstov  @author V. F. Myshkin (Scientific Supervisor)
+// @date 2026-11-11  @version 0.9.3
+// @copyright Copyright (c) 2026 G4CARE Developers
+// @license SPDX-License-Identifier: Apache-2.0
 //==============================================================================
 
 import { createHash, randomInt } from 'node:crypto';

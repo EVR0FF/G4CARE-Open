@@ -78,7 +78,6 @@ double ProcessExtractor::Get(ColType type, const UnifiedSource& src) const {
         case ColType::ProcessName:
         case ColType::CreatorProcessName:
             // Return process sub-type as identifier for process name
-            // (full string registry would require TypedRegistry<std::string>)
             return static_cast<double>(proc->GetProcessSubType());
     }
     return 0.0;

@@ -1,7 +1,12 @@
 //==============================================================================
-// G4CARE cloud — drive store (folders + share links).
+// G4CARE - drive.ts — Cloud backend: drive (folders/files, trash)
 //
-// Postgres-backed in production; in-memory fallback for the dev/smoke path.
+// Cloud backend: drive (folders/files, trash)
+//
+// @author I. I. Everstov  @author V. F. Myshkin (Scientific Supervisor)
+// @date 2026-11-11  @version 0.9.3
+// @copyright Copyright (c) 2026 G4CARE Developers
+// @license SPDX-License-Identifier: Apache-2.0
 //==============================================================================
 
 import { Pool } from 'pg';
@@ -24,6 +29,9 @@ export interface DriveStore {
   renameFolder(id: string, name: string, owner: string): Promise<boolean>;
   moveFolder(id: string, parentId: string | null, owner: string): Promise<boolean>;
   deleteFolder(id: string, owner: string): Promise<boolean>;
+  listTrashedFolders(owner: string): Promise<FolderRecord[]>;
+  restoreFolder(id: string, owner: string): Promise<boolean>;
+  deleteFolderPermanent(id: string, owner: string): Promise<boolean>;
   createShare(target: { artifactId?: string; folderId?: string }, owner: string): Promise<ShareLink>;
   getShare(token: string): Promise<ShareLink | undefined>;
   deleteShare(token: string, owner: string): Promise<boolean>;
@@ -50,7 +58,7 @@ export class PostgresDriveStore implements DriveStore {
   }
 
   async listFolders(owner: string): Promise<FolderRecord[]> {
-    const res = await this.pool.query('SELECT * FROM folders WHERE owner = $1 ORDER BY name', [owner]);
+    const res = await this.pool.query('SELECT * FROM folders WHERE owner = $1 AND (trashed IS NULL OR trashed = FALSE) ORDER BY name', [owner]);
     return res.rows.map((r) => mapFolderRow(r as Record<string, unknown>));
   }
 
@@ -71,6 +79,21 @@ export class PostgresDriveStore implements DriveStore {
   }
 
   async deleteFolder(id: string, owner: string): Promise<boolean> {
+    const res = await this.pool.query('UPDATE folders SET trashed = TRUE WHERE id = $1 AND owner = $2', [id, owner]);
+    return (res.rowCount ?? 0) > 0;
+  }
+
+  async listTrashedFolders(owner: string): Promise<FolderRecord[]> {
+    const res = await this.pool.query('SELECT * FROM folders WHERE owner = $1 AND trashed = TRUE ORDER BY name', [owner]);
+    return res.rows.map((r) => mapFolderRow(r as Record<string, unknown>));
+  }
+
+  async restoreFolder(id: string, owner: string): Promise<boolean> {
+    const res = await this.pool.query('UPDATE folders SET trashed = FALSE WHERE id = $1 AND owner = $2', [id, owner]);
+    return (res.rowCount ?? 0) > 0;
+  }
+
+  async deleteFolderPermanent(id: string, owner: string): Promise<boolean> {
     const res = await this.pool.query('DELETE FROM folders WHERE id = $1 AND owner = $2', [id, owner]);
     return (res.rowCount ?? 0) > 0;
   }
@@ -115,7 +138,7 @@ export class MemoryDriveStore implements DriveStore {
     this.folders.push(rec);
     return rec;
   }
-  async listFolders(owner: string): Promise<FolderRecord[]> { return this.folders.filter((f) => f.owner === owner); }
+  async listFolders(owner: string): Promise<FolderRecord[]> { return this.folders.filter((f) => f.owner === owner && !f.trashed); }
   async getFolder(id: string): Promise<FolderRecord | undefined> { return this.folders.find((f) => f.id === id); }
   async renameFolder(id: string, name: string, owner: string): Promise<boolean> {
     const f = this.folders.find((f) => f.id === id && f.owner === owner);
@@ -130,6 +153,19 @@ export class MemoryDriveStore implements DriveStore {
     return true;
   }
   async deleteFolder(id: string, owner: string): Promise<boolean> {
+    const f = this.folders.find((f) => f.id === id && f.owner === owner && !f.trashed);
+    if (!f) return false;
+    f.trashed = true;
+    return true;
+  }
+  async listTrashedFolders(owner: string): Promise<FolderRecord[]> { return this.folders.filter((f) => f.owner === owner && f.trashed); }
+  async restoreFolder(id: string, owner: string): Promise<boolean> {
+    const f = this.folders.find((f) => f.id === id && f.owner === owner && f.trashed);
+    if (!f) return false;
+    f.trashed = false;
+    return true;
+  }
+  async deleteFolderPermanent(id: string, owner: string): Promise<boolean> {
     const i = this.folders.findIndex((f) => f.id === id && f.owner === owner);
     if (i === -1) return false;
     this.folders.splice(i, 1);

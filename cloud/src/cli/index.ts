@@ -1,14 +1,12 @@
 //==============================================================================
-// G4CARE cloud — command-line client (`g4care-cloud`).
+// G4CARE - index.ts — Cloud CLI
 //
-// Commands:
-//   init <file>                        create <file>.meta.toml template
-//   push <file> [--meta <m>]           upload artifact (+ metadata)
-//   pull <id> <dest>                   download artifact by id
-//   verify <file> <sha256>             check integrity
-//   list [--q|--tag|--author|--institute|--type]  search artifacts
+// Cloud CLI
 //
-// Env: G4CARE_CLOUD_SERVER (default http://127.0.0.1:3000)
+// @author I. I. Everstov  @author V. F. Myshkin (Scientific Supervisor)
+// @date 2026-11-11  @version 0.9.3
+// @copyright Copyright (c) 2026 G4CARE Developers
+// @license SPDX-License-Identifier: Apache-2.0
 //==============================================================================
 
 import { readFile, writeFile, rm, mkdir } from 'node:fs/promises';

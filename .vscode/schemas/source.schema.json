@@ -11,7 +11,7 @@
       "enum": ["flow", "event"],
       "default": "flow",
       "markdownDescription": "En: Particle source mode.\n  `flow` — all sources generate particles in every event (default).\n  `event` — one source per event, selected by weight.\nRu: Режим источника частиц.\n  `flow` — все источники генерируют частицы в каждом событии (по умолчанию).\n  `event` — один источник на событие, выбирается по весу.\nDefault: `flow`."
-    }
+    },
   },
   "patternProperties": {
     "^.*$": {
@@ -20,12 +20,12 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["gps", "GPS", "particleGun", "activation", "radioactive", "mixture"],
+          "enum": ["gps", "GPS", "particleGun", "activation", "radioactive", "mixture", "table"],
           "markdownDescription": "En: Source type.\n  `gps`/`GPS` — General Particle Source.\n  `particleGun` — fixed particle parameters.\n  `activation` — activation source.\n  `radioactive` — radioactive decay.\n  `mixture` — mix of multiple sources.\nRu: Тип источника.\n  `gps`/`GPS` — General Particle Source.\n  `particleGun` — фиксированные параметры.\n  `activation` — источник активации.\n  `radioactive` — радиоактивный распад.\n  `mixture` — смесь источников."
         },
         "weight": {
-          "type": "number", "default": 1.0,
-          "markdownDescription": "En: Source weight for mixture mode.\nRu: Вес источника для режима mixture.\nDefault: `1.0`."
+          "type": ["number", "string"], "default": 1.0,
+          "markdownDescription": "En: Source weight for mixture mode. For type=table, overrides the file weight (ExprTK `$$...$$` allowed, e.g. `$$ wt * 2 $$`).\nRu: Вес источника для режима mixture. Для type=table перекрывает вес из файла (можно ExprTK `$$...$$`, напр. `$$ wt * 2 $$`).\nDefault: `1.0`."
         },
         "particle": {
           "type": "string",
@@ -33,7 +33,7 @@
         },
         "energy": {
           "type": ["number", "string"],
-          "markdownDescription": "En: Particle energy with units.\nRu: Энергия частицы с единицами.\n\nExample: `\"1*MeV\"`, `100*keV`."
+          "markdownDescription": "En: Particle energy with units. For type=table, fallback energy in MeV when the file has no energy column (ExprTK `$$...$$` allowed, e.g. `$$ x * 10 $$ keV`).\nRu: Энергия частицы с единицами. Для type=table — энергия по умолчанию в МэВ, если в файле нет колонки энергии (можно ExprTK `$$...$$`, напр. `$$ x * 10 $$ keV`).\n\nExample: `\"1*MeV\"`, `100*keV`."
         },
         "direction": {
           "type": "object",
@@ -43,19 +43,16 @@
         "pos": {
           "type": "object",
           "properties": { "x": { "type": ["number", "string"] }, "y": { "type": ["number", "string"] }, "z": { "type": ["number", "string"] } },
-          "markdownDescription": "En: Source position.\nRu: Позиция источника."
+          "markdownDescription": "En: Source position. For type=table, fixed point {x,y,z} in cm overriding the file position (ExprTK `$$...$$` allowed).\nRu: Позиция источника. Для type=table — фиксированная точка {x,y,z} в см, перекрывающая позицию из файла (можно ExprTK `$$...$$`)."
         },
         "time": { "type": ["number", "string"], "markdownDescription": "En: Global emission time.\nRu: Глобальное время испускания." },
         "macro": { "type": "string", "markdownDescription": "En: Macro path for gps/particleGun/radioactive.\nRu: Путь к макросу." },
+        "file": { "type": "string", "markdownDescription": "En: Particle table file (CSV / ROOT / IAEA .IAEAheader) for type=table. Kinematics (type/energy/direction/weight) come from the file; position can be re-placed via `pos` / `offset` / `object` / `surface`.\nRu: Файл таблицы частиц (CSV / ROOT / IAEA .IAEAheader) для type=table. Кинематика (тип/энергия/направление/вес) берётся из файла; позицию можно переопределить через `pos` / `offset` / `object` / `surface`." },
         "vertex_mode": {
           "type": "string", "enum": ["sequential", "random"],
           "markdownDescription": "En: Vertex selection mode.\n  `sequential` — sequentially. `random` — randomly.\nRu: Режим выбора вершин."
         },
-        "reject_if": { "type": "string", "markdownDescription": "En: Reject condition (ExprTK).\nRu: Условие отбрасывания (ExprTK)." },
-        "variables": {
-          "type": "object", "patternProperties": { "^.*$": { "type": "string" } },
-          "markdownDescription": "En: User variables for expressions.\nRu: Пользовательские переменные."
-        },
+        "reject_if": { "type": "string", "markdownDescription": "En: Reject condition (ExprTK, bare expression — no `$$` needed). For type=table, skips the particle when the expression is non-zero. Variables: event_id, x, y, z, energy, u, v, w, wt.\nRu: Условие отбрасывания (ExprTK, без `$$`). Для type=table отбрасывает частицу, если выражение не равно нулю. Переменные: event_id, x, y, z, energy, u, v, w, wt." },
         "data_alias": { "type": "string", "markdownDescription": "En: Data table alias for value substitution (ParticleGunSource).\nRu: Алиас таблицы данных (ParticleGunSource)." },
         "data": { "type": "string", "markdownDescription": "En: Data alias name (ActivationSource). References a DATA block subsection.\nRu: Имя алиаса данных (ActivationSource). Ссылается на подсекцию блока DATA." },
         "mode": {
@@ -64,7 +61,9 @@
         },
         "reset_time": { "type": "boolean", "default": true, "markdownDescription": "En: Reset emission time to 0 (ActivationSource).\nRu: Сбросить время эмиссии в 0 (ActivationSource).\nDefault: `true`." },
         "loop": { "type": "boolean", "default": true, "markdownDescription": "En: Loop data table when exhausted (ActivationSource).\nRu: Зациклить таблицу данных при исчерпании (ActivationSource).\nDefault: `true`." },
-        "object": { "type": "string", "markdownDescription": "En: Logical volume name for volume-based vertex placement (RadioactiveSource).\nRu: Имя логического объёма для размещения вершин (RadioactiveSource)." },
+        "object": { "type": "string", "markdownDescription": "En: Logical volume name for volume-based vertex placement (RadioactiveSource / TableSource). For type=table, samples a uniform point inside the volume.\nRu: Имя логического объёма для размещения вершин (RadioactiveSource / TableSource). Для type=table — равномерная выборка точки внутри объёма." },
+        "surface": { "type": "string", "markdownDescription": "En: Volume name for uniform surface placement (TableSource). Samples a uniform point on the volume surface.\nRu: Имя объёма для равномерного размещения на поверхности (TableSource)." },
+        "offset": { "type": "object", "properties": { "x": { "type": ["number", "string"] }, "y": { "type": ["number", "string"] }, "z": { "type": ["number", "string"] } }, "markdownDescription": "En: Translation {x,y,z} in cm added to the file position (TableSource). ExprTK `$$...$$` allowed.\nRu: Смещение {x,y,z} в см, добавляемое к позиции из файла (TableSource). Можно ExprTK `$$...$$`." },
         "ISOTOPES": {
           "type": "object",
           "description": "Isotope definitions (RadioactiveSource).",

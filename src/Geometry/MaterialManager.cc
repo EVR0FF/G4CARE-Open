@@ -39,6 +39,7 @@
 #include "G4UnitsTable.hh"
 #include <numeric> 
 #include <fstream>
+#include <filesystem>
 #include <sstream>
 
 MaterialManager* MaterialManager::fInstance = nullptr;
@@ -261,6 +262,9 @@ void MaterialManager::BuildOpticalProperties(G4Material* mat, const YAML::Node& 
 bool MaterialManager::BuildMaterials() {
     auto* cfg = ConfigManager::Instance();
     
+    // Load GUI-created user materials from ~/Documents/g4care/materials/.
+    LoadMaterialsFromFolder();
+
     // Check if `materials` block exists
     std::vector<std::string> matIds = cfg->GetSubsections("materials");
     if (matIds.empty()) {
@@ -431,4 +435,89 @@ bool MaterialManager::BuildMaterials() {
 
     return true;
     
+}
+
+/// @brief Load user materials created in the GUI from ~/Documents/g4care/materials/*.yaml.
+void MaterialManager::LoadMaterialsFromFolder() {
+    namespace fs = std::filesystem;
+
+    std::string dirStr;
+    const char* home = std::getenv("HOME");
+    if (!home || !*home) return;
+    dirStr = std::string(home) + "/Documents/g4care/materials";
+
+    std::error_code ec;
+    fs::path dir(dirStr);
+    if (!fs::is_directory(dir, ec)) return;
+
+    for (fs::directory_iterator it(dir, ec), end; it != end && !ec; it.increment(ec)) {
+        if (it->path().extension() != ".yaml") continue;
+        try {
+            YAML::Node root = YAML::LoadFile(it->path().string());
+            if (!root.IsMap()) continue;
+            for (auto mit = root.begin(); mit != root.end(); ++mit) {
+                std::string id = mit->first.as<std::string>();
+                YAML::Node node = mit->second;
+                if (node.IsMap()) BuildMaterialFromNode(id, node);
+            }
+        } catch (const std::exception& e) {
+            G4cerr << "MaterialManager: Failed to load user material file '"
+                   << it->path().string() << "': " << e.what() << G4endl;
+        }
+    }
+}
+
+/// @brief Build a G4Material from a folder-file YAML node.
+G4Material* MaterialManager::BuildMaterialFromNode(const std::string& matId, const YAML::Node& node) {
+    std::string name = node["name"] ? node["name"].as<std::string>() : matId;
+    if (name.empty() || G4Material::GetMaterial(name, false)) return nullptr;
+
+    G4double density = 0.0;
+    if (node["density"]) density = ParseDoubleWithUnit(node["density"].as<std::string>());
+    if (density <= 0.0) {
+        G4cerr << "MaterialManager: user material '" << name << "' has invalid density. Skipping." << G4endl;
+        return nullptr;
+    }
+
+    G4double temperature = node["temperature"]
+        ? ParseDoubleWithUnit(node["temperature"].as<std::string>()) : (273.15 * kelvin);
+    G4double pressure = node["pressure"]
+        ? ParseDoubleWithUnit(node["pressure"].as<std::string>()) : (1.0 * atmosphere);
+
+    G4State state = kStateUndefined;
+    std::string stateStr = node["state"] ? node["state"].as<std::string>() : "undefined";
+    if (stateStr == "gas") state = kStateGas;
+    else if (stateStr == "liquid") state = kStateLiquid;
+    else if (stateStr == "solid") state = kStateSolid;
+
+    std::vector<G4Element*> elementList;
+    std::vector<G4double> fractionList;
+    if (node["elements"] && node["elements"].IsMap()) {
+        G4NistManager* nist = G4NistManager::Instance();
+        for (auto el = node["elements"].begin(); el != node["elements"].end(); ++el) {
+            YAML::Node e = el->second;
+            if (!e.IsMap()) continue;
+            std::string elemName = e["name"] ? e["name"].as<std::string>() : el->first.as<std::string>();
+            G4int Z = e["Z"] ? e["Z"].as<G4int>() : 0;
+            G4double abundance = e["abundance"] ? e["abundance"].as<G4double>() : 0.0;
+            if (Z <= 0 || abundance <= 0.0) continue;
+            G4Element* element = nist->FindOrBuildElement(Z, false);
+            if (!element) element = new G4Element(elemName, elemName, Z);
+            elementList.push_back(element);
+            fractionList.push_back(abundance);
+        }
+    }
+
+    if (elementList.empty()) {
+        G4cerr << "MaterialManager: user material '" << name << "' has no valid elements. Skipping." << G4endl;
+        return nullptr;
+    }
+
+    G4Material* material = new G4Material(name, density, elementList.size(), state, temperature, pressure);
+    for (size_t i = 0; i < elementList.size(); ++i) {
+        material->AddElement(elementList[i], fractionList[i]);
+    }
+    G4cout << "MaterialManager: Loaded user material '" << name << "' ("
+           << density / (g / cm3) << " g/cm3, " << elementList.size() << " elements)." << G4endl;
+    return material;
 }

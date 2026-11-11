@@ -36,6 +36,7 @@ struct RTStruct {
     struct ROI {
         int number = 0;              ///< ROINumber (unique id).
         std::string name;            ///< ROIName.
+        std::string type;            ///< RTROIInterpretedType (ORGAN, CTV, GTV, AVOIDANCE, ...).
         std::vector<Contour> contours;
     };
 

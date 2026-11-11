@@ -1,11 +1,12 @@
 //==============================================================================
-// G4CARE cloud — REST API (Fastify).
+// G4CARE - server.ts — Cloud backend: HTTP server
 //
-// Endpoints:
-//   POST /artifacts                 multipart upload ("file" + optional "meta")
-//   GET  /artifacts                 search/list (?q=&tag=&author=&institute=&type=)
-//   GET  /artifacts/:id             metadata of one artifact
-//   GET  /artifacts/:id/download    download (header X-G4CARE-SHA256)
+// Cloud backend: HTTP server
+//
+// @author I. I. Everstov  @author V. F. Myshkin (Scientific Supervisor)
+// @date 2026-11-11  @version 0.9.3
+// @copyright Copyright (c) 2026 G4CARE Developers
+// @license SPDX-License-Identifier: Apache-2.0
 //==============================================================================
 
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -385,7 +386,30 @@ export async function buildServer(cfg: CloudConfig): Promise<FastifyInstance> {
   app.delete<{ Params: { id: string } }>('/folders/:id', async (req, reply) => {
     const user = (req as unknown as { user: AuthedUser }).user;
     if (!user) return reply.code(401).send({ error: 'authentication required' });
+    // Soft delete: move to trash so files inside can be restored.
     const ok = await drive.deleteFolder(req.params.id, String((user as { username?: string }).username ?? ''));
+    if (!ok) return reply.code(404).send({ error: 'not found' });
+    return { trashed: true };
+  });
+
+  app.get('/folders/trash', async (req, reply) => {
+    const user = (req as unknown as { user: AuthedUser }).user;
+    if (!user) return reply.code(401).send({ error: 'authentication required' });
+    return drive.listTrashedFolders(String((user as { username?: string }).username ?? ''));
+  });
+
+  app.post<{ Params: { id: string } }>('/folders/:id/restore', async (req, reply) => {
+    const user = (req as unknown as { user: AuthedUser }).user;
+    if (!user) return reply.code(401).send({ error: 'authentication required' });
+    const ok = await drive.restoreFolder(req.params.id, String((user as { username?: string }).username ?? ''));
+    if (!ok) return reply.code(404).send({ error: 'not found' });
+    return { restored: true };
+  });
+
+  app.delete<{ Params: { id: string } }>('/folders/:id/permanent', async (req, reply) => {
+    const user = (req as unknown as { user: AuthedUser }).user;
+    if (!user) return reply.code(401).send({ error: 'authentication required' });
+    const ok = await drive.deleteFolderPermanent(req.params.id, String((user as { username?: string }).username ?? ''));
     if (!ok) return reply.code(404).send({ error: 'not found' });
     return { deleted: true };
   });

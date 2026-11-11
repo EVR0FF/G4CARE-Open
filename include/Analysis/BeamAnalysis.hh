@@ -9,19 +9,19 @@
 // @details
 //   Thread-local singleton that owns all analysis infrastructure:
 //
-//   - G4AnalysisManager: ROOT file creation, NTuple booking, writing.
+//   - OutputManager: RNTuple stream booking and writing.
 //   - Template Fill(): dispatches step, track, GPS vertex, and map-based
 //     data to BeamDataExtractor, evaluates filter expressions, and writes
 //     NTuple rows.
 //   - Registries (thread-safe, master-initialised once): materials,
 //     volumes, surfaces, detectors, chemical species, particle names,
-//     process sub-types, and dictionary trees.
+//     process sub-types.
 //   - TreeManager: builds per-NTUPLE column lists (ColType) and filter
 //     expressions from NTUPLE.* YAML blocks.
-//   - CrossSectionCalculator, ExpressionEvaluator, ExpressionManager,
-//     DictionaryWriter — all owned and accessible via this singleton.
+//   - CrossSectionCalculator, ExpressionEvaluator, ExpressionManager —
+//     all owned and accessible via this singleton.
 //
-//   Configuration keys read: ENABLE_DICTIONARY, NTUPLES.*.
+//   Configuration keys read: OUTPUT.*.
 //
 // @author  I. I. Everstov
 // @author  V. F. Myshkin (Scientific Supervisor)
@@ -38,11 +38,9 @@
 #define BEAM_ANALYSIS_HH
 
 #include "G4Threading.hh"
-#include "G4AnalysisManager.hh"
 #include "VolumeMaterialRegistry.hh"
 #include "CrossSectionCalculator.hh"
 #include "DataExtractor.hh"
-#include "TreeManager.hh"
 #include "ExpressionEvaluator.hh"
 #include "ExpressionManager.hh"
 #include "UnifiedSource.hh"
@@ -50,8 +48,8 @@
 #include "DetectorRegistry.hh"
 #include "SurfaceRegistry.hh"
 #include "ChemSpeciesRegistry.hh"
-#include "DictionaryWriter.hh"
-#include "ExprsManager.hh"
+#include "ScriptsManager.hh"
+#include "OutputManager.hh"
 #include <memory>
 #include <string>
 
@@ -69,7 +67,7 @@ struct ThreadCache {
 
 /// @brief Central analysis manager — thread-local singleton.
 ///
-/// Owns G4AnalysisManager, registries, data extractor, tree manager,
+/// Owns registries, data extractor, expression evaluator,
 /// expression evaluator, and cross-section calculator.  Provides the
 /// primary Fill() template used by SteppingAction, TrackingAction,
 /// and EventAction to record simulation data.
@@ -93,7 +91,7 @@ public:
     ///
     /// Builds FilterVars via DataExtractor, evaluates optional filter
     /// expression and SCRIPT expressions, then fills NTuple columns
-    /// (double, dictionary int, or string) and adds a row.
+    /// (double or string) and adds a row.
     /// @tparam SourceType Deduced from G4Step*, G4Track*, or UnifiedSource.
     /// @param treeName  NTuple tree name (e.g. "g4care", "secondary").
     /// @param source    Step, track, or vertex data wrapper.
@@ -104,8 +102,7 @@ public:
     void Fill(const std::string& treeName, const SourceType& source, int eventId = -1, int volId = -1, int matId = -1);
 
     /// @brief NTuple fill from a pre-built name-value map (used for
-    ///        "activation" and "exprs_user" trees).
-    void Fill(const std::string& treeName, const std::map<std::string, double>& values);
+    ///        "activation" and "scripts_user" trees).
 
     /// @name Registry accessors
     /// @{
@@ -115,13 +112,10 @@ public:
     DetectorRegistry* GetDetectorRegistry() const { return fDetectorRegistry; }
     SurfaceRegistry* GetSurfaceRegistry() const { return fSurfaceRegistry.get(); }
     ChemSpeciesRegistry* GetChemSpeciesRegistry() const { return fChemSpeciesReg.get(); }
-    TypedRegistry<std::string>* GetParticleNameRegistry() const { return fParticleNameReg.get(); }
-    TypedRegistry<std::string>* GetVolumeNameRegistry() const { return fVolumeNameReg.get(); }
     DataExtractor* GetDataExtractor() const { return fDataExtractor.get(); }
-    TreeManager* GetTreeManager() const { return fTreeManager.get(); }
-    G4AnalysisManager* GetAnalysisManager() const { return fAnalysisManager; }
     ExpressionEvaluator* GetEvaluator() const { return fEvaluator.get(); }
     ExpressionManager* GetExpressionManager() const { return fExpressionManager.get(); }
+    OutputManager* GetOutputManager() const { return fOutputManager.get(); }
     /// @}
 
     /// @brief Set the detector registry (owned by GeometryManager).
@@ -140,36 +134,21 @@ private:
     /// @brief Global: registry registration is performed once by master.
     static bool fMasterInitDone;
 
-    G4AnalysisManager* fAnalysisManager = nullptr;
     std::unique_ptr<ExpressionEvaluator> fEvaluator;
     std::unique_ptr<VolumeMaterialRegistry> fRegistry;
     std::unique_ptr<CrossSectionCalculator> fXSCalculator;
     std::unique_ptr<DataExtractor> fDataExtractor;
-    std::unique_ptr<TreeManager> fTreeManager;
     
-    std::unique_ptr<TypedRegistry<std::string>> fParticleNameReg;
-    std::unique_ptr<TypedRegistry<std::string>> fVolumeNameReg;
-    std::unique_ptr<TypedRegistry<std::string>> fMaterialNameReg;
-    std::unique_ptr<TypedRegistry<std::string>> fRegionNameReg;
-    std::unique_ptr<TypedRegistry<std::string>> fSourceNameReg;
-    std::unique_ptr<TypedRegistry<std::string>> fDetectorNameReg;
-    std::unique_ptr<TypedRegistry<std::string>> fTouchablePathReg;
-    std::unique_ptr<TypedRegistry<std::string>> fChemicalFormulaReg;
-    std::unique_ptr<TypedRegistry<int>> fPDGReg;
-    std::unique_ptr<TypedRegistry<double>> fMassReg;
-    std::unique_ptr<TypedRegistry<double>> fChargeReg;
     DetectorRegistry* fDetectorRegistry = nullptr;  // Owned by GeometryManager
     std::unique_ptr<SurfaceRegistry> fSurfaceRegistry;
     std::unique_ptr<ChemSpeciesRegistry> fChemSpeciesReg;
-    std::unique_ptr<TypedRegistry<int>> fProcessSubTypeReg;
-    std::unique_ptr<DictionaryWriter> fDictionaryWriter;
+    std::unique_ptr<OutputManager> fOutputManager;
     std::unique_ptr<ExpressionManager> fExpressionManager;
 
     /// @brief Evaluate a filter expression for a given NTuple tree.
     /// @param tree TreeInfo with compiled filter expression.
     /// @param vars FilterVars populated for the current step/track.
     /// @return @c true if the data should be recorded.
-    bool PassFilter(const TreeManager::TreeInfo& tree, const FilterVars& vars) const;
 };
 
 /// @brief Templated NTuple fill implementation.
@@ -181,59 +160,17 @@ private:
 /// 4. Evaluates all SCRIPT expressions at Step level (ExpressionManager).
 /// 5. Iterates active columns: for Expression columns the evaluator is
 ///    called; for built-in columns DataExtractor::GetDouble/GetString is
-///    used.  Dictionary columns are stored as integer indices.
-/// 6. Adds a ROOT NTuple row via G4AnalysisManager.
+///    used.  Name/string columns are stored as strings.
+/// 6. Fills the RNTuple stream via OutputManager.
 template<typename SourceType>
 void BeamAnalysis::Fill(const std::string& treeName, const SourceType& source, int eventId, int volId, int matId) {
-    auto* tree = fTreeManager->GetTree(treeName);
-    if (!tree || tree->activeColumns.empty()) return;
-
-    UnifiedSource src(source);
-    FilterVars filterVars{};
-
-    bool hasFilter = (tree->filter != nullptr);
-    bool hasExpr = std::any_of(tree->activeColumns.begin(), tree->activeColumns.end(),
-                               [&tree](size_t idx) {
-                                   return tree->allColumns[idx].type == ColType::Expression;
-                               });
-
-    const std::vector<FilterVar>* neededVars = nullptr;
-    if (hasFilter && !hasExpr) {
-        neededVars = &tree->filterVarIndices;
-    }
-
-    if (hasFilter || hasExpr) {
-        fDataExtractor->BuildFilterVars(filterVars, src, eventId, volId, matId, neededVars);
-        if (hasFilter && !PassFilter(*tree, filterVars)) return;
-    }
-
-    // Evaluate all SCRIPT expressions before filling columns
-    if (fExpressionManager && hasExpr) {
-        fExpressionManager->EvaluateAll(ExpressionManager::Level::Step, filterVars, {});
-    }
-
-    for (size_t idx : tree->activeColumns) {
-        const auto& col = tree->allColumns[idx];
-        double val = 0.0;
-        if (col.type == ColType::Expression && col.expr) {
-            val = fEvaluator->Execute(col.expr.get(), filterVars);
-        } else if (col.type == ColType::Expression && !col.expressionRef.empty() && fExpressionManager) {
-            val = fExpressionManager->GetValue(col.expressionRef, 0.0);
-        } else {
-            val = fDataExtractor->GetDouble(col.type, src, eventId);
-        }
-        if (col.isDictionary) {
-            fAnalysisManager->FillNtupleIColumn(tree->ntupleId, col.ntupleColumnId,
-                                                static_cast<int>(val));
-        } else if (col.isSColumn) {
-            std::string s = fDataExtractor->GetString(col.type, src);
-            fAnalysisManager->FillNtupleSColumn(tree->ntupleId, col.ntupleColumnId, s);
-        } else {
-            fAnalysisManager->FillNtupleDColumn(tree->ntupleId, col.ntupleColumnId, val);
+    // RNTuple output path (OUTPUT config).
+    if (fOutputManager && fOutputManager->IsEnabled()) {
+        StreamLevel level = LevelFromTreeName(treeName);
+        if (level != StreamLevel::Unknown) {
+            UnifiedSource src(source);
+            fOutputManager->Fill(level, src, fDataExtractor.get(), fEvaluator.get(), eventId, volId, matId);
         }
     }
-    fAnalysisManager->AddNtupleRow(tree->ntupleId);
 }
-
-
 #endif

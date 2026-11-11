@@ -1,0 +1,220 @@
+/*==============================================================================
+ * G4CARE - theme.css — Application theme: CSS variables and shared component styles
+ *
+ * Application theme: CSS variables and shared component styles
+ *
+ * @author I. I. Everstov  @author V. F. Myshkin (Scientific Supervisor)
+ * @date 2026-11-11  @version 0.9.3
+ * @copyright Copyright (c) 2026 G4CARE Developers
+ * @license SPDX-License-Identifier: Apache-2.0
+ *=================================================================================*/
+
+:root {
+    /* palette */
+    --bg: #17191d;
+    --bg-bar: #131519;
+    --panel: #202329;
+    --panel-2: #14161a;
+    --inset: #111317;
+    --border: #343941;
+    --border-soft: #2a2a2e;
+    --text: #e2e5ea;
+    --text-2: #969da8;
+    --text-3: #777;
+    --accent: #e8752a;
+    --accent-strong: #f0883a;
+    --accent-soft: rgba(232, 117, 42, 0.16);
+    --accent-border: #d97a3a;
+    --danger: #ff5a5a;
+    --warn: #ffb;
+    --ok: #8f8;
+    --info: #9cf;
+    /* typography */
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    /* metrics */
+    --ctrl-h: 32px;
+    --ctrl-h-sm: 26px;
+    --icon-size: 16px;
+    --radius: 4px;
+    --radius-sm: 3px;
+    --pad: 8px;
+    --pad-sm: 6px;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+    margin: 0;
+    font-family: var(--sans);
+    font-size: 13px;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* shared icon sizing */
+.g4c-icon { display: inline-block; flex: none; vertical-align: middle; }
+
+button {
+    padding: 5px 12px;
+    cursor: pointer;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font: 13px var(--sans);
+    min-height: var(--ctrl-h-sm);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+button:hover { background: #2a2d33; }
+button:active { background: #26282d; }
+button.active {
+    background: var(--accent);
+    border-color: var(--accent-border);
+    color: #1a1a1a;
+}
+button.primary {
+    background: var(--accent);
+    border-color: var(--accent-border);
+    color: #1a1a1a;
+    font-weight: 600;
+}
+button.primary:hover { background: var(--accent-strong); }
+button:disabled { opacity: 0.45; cursor: default; }
+
+input, select, textarea {
+    background: var(--inset);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 3px 6px;
+    font: 12px var(--sans);
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+select option { background: var(--inset); color: var(--text); }
+select option:hover, select option:checked { background: var(--accent); color: #1a1a1a; }
+input[type="range"] { accent-color: var(--accent); }
+
+/* ── custom dropdown (neutral hover, orange pick) ── */
+.csel { position: relative; display: inline-flex; align-items: center; }
+.csel-btn { background: var(--inset); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 3px 8px; font: 12px var(--sans); display: inline-flex; align-items: center; gap: 6px; cursor: pointer; min-height: var(--ctrl-h-sm); width: 100%; box-sizing: border-box; }
+.csel-btn:hover { background: #2a2d33; }
+.csel-caret { color: var(--text-3); font-size: 10px; flex: none; }
+.csel-label { flex: 1; min-width: 0; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.csel-menu { display: none; position: fixed; background: var(--panel); border: 1px solid var(--border); border-radius: 4px; z-index: 100000; max-height: 240px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+.csel-menu.open { display: block; }
+.csel-item { padding: 5px 10px; cursor: pointer; font: 12px var(--sans); color: var(--text); white-space: nowrap; }
+.csel-item:hover { background: #2a2d33; }
+.csel-item.sel { background: var(--accent); color: #1a1a1a; }
+
+/* ── top-level tab bar ── */
+#tabs { display: flex; background: var(--bg-bar); border-bottom: 1px solid var(--border); flex: none; }
+.tab {
+    padding: 8px 16px; cursor: pointer; background: transparent; color: var(--text-2);
+    border: none; border-right: 1px solid var(--border-soft); border-radius: 0;
+    display: inline-flex; align-items: center; gap: 6px; min-height: 36px;
+}
+.tab:hover { background: #1a1c20; color: var(--text); }
+.tab.active { background: var(--bg); color: var(--text); border-bottom: 2px solid var(--accent); }
+
+/* ── layout skeleton ── */
+#main { flex: 1; min-height: 0; display: flex; }
+#sidebar { display: flex; flex-direction: column; width: 220px; min-width: 220px; border-right: 1px solid var(--border); background: var(--panel-2); overflow-y: auto; }
+.side-title { padding: 8px 12px; font-size: 11px; text-transform: uppercase; color: var(--text-3); letter-spacing: .05em; border-bottom: 1px solid var(--border-soft); }
+.side-item { padding: 6px 12px 6px 20px; cursor: pointer; color: #ccc; font: 13px var(--mono); border-left: 3px solid transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.side-item:hover { background: #222; }
+.side-item.active { background: var(--accent-soft); border-left: 3px solid var(--accent); color: var(--text); }
+.side-action { display: inline-flex; align-items: center; gap: 6px; width: 100%; text-align: left; padding: 6px 12px; background: none; border: none; border-radius: 0; color: var(--text-2); cursor: pointer; font: 13px var(--sans); min-height: 0; }
+.side-action:hover { background: #222; color: var(--text); }
+.side-tab { flex: 1; padding: 7px 6px; background: #141416; color: var(--text-3); border: none; cursor: pointer; font: 12px var(--sans); border-radius: 0; }
+.side-tab.active { background: #e8752a; color: #1a1a1a; }
+
+#content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pane { flex: 1; min-height: 0; display: none; flex-direction: column; }
+.pane.active { display: flex; }
+#toolbar { padding: 8px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* ── DICOM tab: grouped toolbar ── */
+.dcm-tgroup { padding: 5px 14px; cursor: pointer; background: var(--panel-2); color: var(--text-3); border: 1px solid var(--border); border-radius: 5px; font: 12px var(--sans); margin-right: 2px; }
+.dcm-tgroup.active { background: #262a30; color: var(--text); border-color: var(--border); }
+.dcm-tgroup-pane { display: none; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dcm-tgroup-pane.active { display: flex; }
+.dcm-caption { color: var(--accent); font: 11px var(--sans); font-weight: 600; letter-spacing: .04em; }
+.dcm-tool-btn { padding: 4px 2px; cursor: pointer; background: #222; color: var(--text); border: 1px solid var(--border); font: 12px var(--sans); border-radius: 3px; text-align: center; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+.dcm-tool-btn:hover { background: #333; }
+.dcm-tool-btn.active { background: var(--accent); border-color: var(--accent-border); color: #1a1a1a; }
+.dcm-main-tab { flex: 1; padding: 6px; background: #141416; color: var(--text-3); border: none; cursor: pointer; font: 12px var(--sans); border-radius: 0; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+.dcm-main-tab.active { background: #1d1d20; color: #ccc; }
+.dcm-sec { border-bottom: 1px solid var(--border-soft); }
+.dcm-sec-head { width: 100%; text-align: left; padding: 6px 10px; background: #18181b; color: #ccc; border: none; cursor: pointer; font: 12px var(--sans); font-weight: bold; border-radius: 0; display: inline-flex; align-items: center; gap: 6px; }
+.dcm-sec-caret { width: 10px; flex: none; font-size: 10px; color: var(--text-3); }
+.dcm-sec-label { flex: 1; min-width: 0; }
+.dcm-sec-head:hover { background: #202024; }
+.dcm-sec-body { padding: 6px 8px; }
+.dcm-sec-body.collapsed { display: none !important; }
+/* ── status / editor / progress / log ── */
+#status { color: var(--warn); font-weight: bold; }
+#editor { flex: 1; min-height: 0; }
+#progress { height: 16px; background: #333; flex: none; }
+#bar { height: 100%; width: 0; background: var(--accent); transition: width .1s; }
+
+/* ── toolbar group separators ── */
+.tb-sep { width: 1px; align-self: stretch; background: var(--border); margin: 0 2px; flex: none; }
+
+/* ── collapsible console (журнал / консоль / ошибки) ── */
+#console { flex: none; display: flex; flex-direction: column; border-top: 1px solid var(--border); }
+#console-head { display: flex; align-items: center; gap: 2px; background: var(--bg-bar); border-bottom: 1px solid var(--border); padding: 0 4px; min-height: 27px; flex: none; }
+.ctab { padding: 3px 10px; background: none; border: none; border-radius: 0; color: var(--text-2); cursor: pointer; font: 12px var(--sans); min-height: 0; }
+.ctab:hover { color: var(--text); }
+.ctab.active { color: var(--text); box-shadow: inset 0 -2px 0 var(--accent); }
+#console-collapse { margin-left: auto; padding: 2px 6px; background: none; border: none; color: var(--text-2); cursor: pointer; min-height: 0; }
+#console-collapse:hover { color: var(--text); }
+#console-collapse .g4c-icon { transition: transform .12s ease; }
+#console-body.collapsed #console-collapse .g4c-icon { transform: rotate(180deg); }
+#log, #console-pane, #errors-pane { display: none; height: 140px; overflow: auto; background: #0c0e11; color: var(--text); font: 12px var(--mono); padding: 6px; white-space: pre-wrap; }
+#log.active, #console-pane.active, #errors-pane.active { display: block; }
+#console-body.collapsed #log, #console-body.collapsed #console-pane, #console-body.collapsed #errors-pane { display: none !important; }
+
+/* ── results tab ── */
+#viewer-frame, #cloud-frame, #paraview-frame { width: 100%; height: 100%; border: none; }
+#viewer-pane { flex: 1; min-width: 0; background: #000; }
+#results-tabs { display: flex; background: var(--bg-bar); border-bottom: 1px solid var(--border); flex: none; }
+.rtab { padding: 6px 14px; cursor: pointer; background: transparent; color: var(--text-2); border: none; border-right: 1px solid var(--border-soft); border-radius: 0; display: inline-flex; align-items: center; gap: 6px; }
+.rtab.active { background: var(--bg); color: var(--text); border-bottom: 2px solid var(--accent); }
+.rpane { flex: 1; min-height: 0; display: none; }
+.rpane.active { display: flex; flex-direction: column; }
+#root-keys { width: 260px; overflow: auto; border-right: 1px solid var(--border); padding: 8px; font: 13px var(--mono); }
+#root-draw { flex: 1; min-height: 0; }
+
+/* ── Geant4-style command line ── */
+#cmdline { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-top: 1px solid var(--border); background: var(--bg-bar); font: 13px var(--mono); flex: none; }
+#cmd-prompt { color: var(--ok); white-space: nowrap; }
+#cmd-input { flex: 1; background: var(--inset); color: var(--text); border: 1px solid var(--border); padding: 4px 8px; font: 13px var(--mono); outline: none; }
+
+/* Editor tab strip (VSCode-style) */
+#editor-tabs { user-select: none; }
+.edtab {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 9px; margin: 2px 1px 0 0;
+    background: var(--panel); color: var(--text-3);
+    border: 1px solid var(--border); border-bottom: none;
+    border-radius: 4px 4px 0 0; cursor: pointer;
+    font: 12px var(--sans); white-space: nowrap; flex: none;
+}
+.edtab:hover { background: #2a2d33; color: var(--text-2); }
+.edtab.active { background: var(--panel-2); color: var(--text); border-top: 2px solid var(--accent); }
+.edtab-kind { font-size: 10px; color: var(--text-3); text-transform: uppercase; }
+.edtab-dirty { color: var(--accent); font-size: 11px; line-height: 1; }
+.edtab-close { color: var(--text-3); font-size: 11px; padding: 0 2px; border-radius: 3px; }
+.edtab-close:hover { color: #fff; background: var(--accent); }
+.edtab-plus { background: transparent; border: none; color: var(--text-2); cursor: pointer; font: 13px var(--sans); padding: 2px 8px; flex: none; }
+.edtab-plus:hover { color: var(--text); background: #2a2d33; border-radius: 3px; }
+

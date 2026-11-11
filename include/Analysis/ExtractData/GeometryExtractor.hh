@@ -16,25 +16,18 @@
 #include "ColumnTypes.hh"
 #include "UnifiedSource.hh"
 #include "VolumeMaterialRegistry.hh"
-#include "TypedRegistry.hh"
 
 /// @brief Extracts volume, region, and touchable-path data.
 class GeometryExtractor {
 public:
-    GeometryExtractor(VolumeMaterialRegistry* registry,
-                      TypedRegistry<std::string>* volumeNameReg = nullptr,
-                      TypedRegistry<std::string>* regionNameReg = nullptr,
-                      TypedRegistry<std::string>* touchablePathReg = nullptr)
-        : fRegistry(registry), fVolumeNameReg(volumeNameReg), fRegionNameReg(regionNameReg), fTouchablePathReg(touchablePathReg) {}
+    GeometryExtractor(VolumeMaterialRegistry* registry)
+        : fRegistry(registry) {}
 
     [[nodiscard]] double Get(ColType type, const UnifiedSource& src, int volId) const;
     [[nodiscard]] std::string GetString(ColType type, const UnifiedSource& src) const;
 
 private:
     VolumeMaterialRegistry* fRegistry;
-    TypedRegistry<std::string>* fVolumeNameReg;
-    TypedRegistry<std::string>* fRegionNameReg;
-    TypedRegistry<std::string>* fTouchablePathReg;
 };
 
 #endif // GEOMETRY_EXTRACTOR_HH

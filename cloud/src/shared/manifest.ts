@@ -1,9 +1,12 @@
 //==============================================================================
-// G4CARE cloud — manifest / metadata handling (TOML).
+// G4CARE - manifest.ts — Cloud shared: manifest
 //
-// The metadata format is TOML and mirrors the C++ MetaReader canonical layout
-// (see include/DataIO/MetaReader.hh). It is intentionally distinct from the
-// YAML configuration so the two can never be confused.
+// Cloud shared: manifest
+//
+// @author I. I. Everstov  @author V. F. Myshkin (Scientific Supervisor)
+// @date 2026-11-11  @version 0.9.3
+// @copyright Copyright (c) 2026 G4CARE Developers
+// @license SPDX-License-Identifier: Apache-2.0
 //==============================================================================
 
 import { parse, stringify } from 'smol-toml';

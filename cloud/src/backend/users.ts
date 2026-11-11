@@ -1,7 +1,12 @@
 //==============================================================================
-// G4CARE cloud — user store (JSON-file implementation for the MVP).
+// G4CARE - users.ts — Cloud backend: users
 //
-// Production path: a `users` table in PostgreSQL (same contract).
+// Cloud backend: users
+//
+// @author I. I. Everstov  @author V. F. Myshkin (Scientific Supervisor)
+// @date 2026-11-11  @version 0.9.3
+// @copyright Copyright (c) 2026 G4CARE Developers
+// @license SPDX-License-Identifier: Apache-2.0
 //==============================================================================
 
 import { readFile, writeFile } from 'node:fs/promises';

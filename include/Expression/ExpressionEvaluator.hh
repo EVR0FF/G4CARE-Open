@@ -70,6 +70,14 @@ public:
     static int LoadIAEAFile(const std::string& filename);
     static void ClearAll();
 
+    /// Global SCRIPT constants injected into every compiled expression.
+    static void SetGlobalConstants(const std::map<std::string, double>& c) { sGlobalConstants = c; }
+    static const std::map<std::string, double>& GetGlobalConstants() { return sGlobalConstants; }
+
+
+    static void RegisterGlobalFunction(const std::string& name, const std::vector<std::string>& args, const std::string& body);
+    static void ClearGlobalFunctions();
+
 struct VertexAttrFunc : public exprtk::ifunction<double> {
     const std::vector<std::map<std::string, double>>** fVertexResultsPtr; std::string fAttr; VertexAttrFunc(const std::vector<std::map<std::string, double>>** ptr, const std::string& attr) 
     : exprtk::ifunction<double>(1), fVertexResultsPtr(ptr), fAttr(attr) {}
@@ -94,10 +102,35 @@ struct CompiledExpression {
     // ── Chemistry vectors (registered via add_vector in RegisterChemVectors) ──
     std::vector<double> chemNc, chemNt, chemGc, chemGt, chemCharge;
 
+    // ── String variables (registered via add_stringvar) ──
+    std::map<std::string, std::string> stringVars;
+
     ~CompiledExpression() {}
 };
 
+    /// A user-defined function (SCRIPT.functions) callable from any expression.
+    struct GlobalFunction : public exprtk::igeneric_function<double> {
+        std::shared_ptr<CompiledExpression> compiled;
+        std::vector<std::string> argNames;
+        GlobalFunction()
+            : exprtk::igeneric_function<double>("T*", exprtk::igeneric_function<double>::e_rtrn_scalar) {}
+        double operator()(parameter_list_t parameters) override {
+            int n = static_cast<int>(parameters.size());
+            for (int i = 0; i < n; ++i) {
+                auto& p = parameters[i];
+                double val = (p.type == exprtk::type_store<double>::e_scalar)
+                             ? *static_cast<double*>(p.data) : 0.0;
+                if (i < static_cast<int>(argNames.size()) && compiled) {
+                    auto it = compiled->varPtrs.find(argNames[i]);
+                    if (it != compiled->varPtrs.end()) *(it->second) = val;
+                }
+            }
+            return compiled ? compiled->expr.value() : 0.0;
+        }
+    };
+
 static double* GetVariablePtr(CompiledExpression* compiled, const std::string& name);
+static void SetStringVar(CompiledExpression* compiled, const std::string& name, const std::string& value);
 
 struct PrecompiledExpr {
         std::string expr;
@@ -149,8 +182,10 @@ struct ThreadLocalData {
     };
     
 static std::map<std::string, int> fDataAliases;
+    static std::map<std::string, double> sGlobalConstants;
+    static std::map<std::string, std::unique_ptr<GlobalFunction>> sGlobalFunctions;
 
-static G4ThreadLocal std::unique_ptr<ThreadLocalData> fgTLS;
+static std::unique_ptr<ThreadLocalData> fgTLS;
 
 struct RandPoissonFunc : public exprtk::ifunction<double> {
     RandPoissonFunc() : exprtk::ifunction<double>(1) {}
@@ -266,6 +301,18 @@ struct DataCellFunc : public exprtk::ifunction<double> {
     double operator()(const double& idx, const double& row, const double& col) override;
 };
 
+struct Interp1DFunc : public exprtk::ifunction<double> {
+    Interp1DFunc() : exprtk::ifunction<double>(3) {}
+    virtual ~Interp1DFunc() = default;
+    double operator()(const double& idx, const double& x, const double& yCol) override;
+};
+
+struct Interp2DFunc : public exprtk::ifunction<double> {
+    Interp2DFunc() : exprtk::ifunction<double>(4) {}
+    virtual ~Interp2DFunc() = default;
+    double operator()(const double& idx, const double& x, const double& y, const double& zCol) override;
+};
+
     RandPoissonFunc fRandPoisson;
     RandBinomialFunc fRandBinomial;
     RandExponentialFunc fRandExponential;
@@ -331,7 +378,7 @@ public:
     static void ClearKillTrackFlag() { fgKillTrackFlag = false; }
 
     // ── Thread-local output formatting ──
-    struct OutputFormat { int precision = 6; bool scientific = true; };
+    struct OutputFormat { enum class Mode { General, Fixed, Scientific }; int precision = 6; Mode mode = Mode::General; };
     static thread_local OutputFormat s_outFmt;
 
     // ── format(N) sets std::cout precision for io::package println/print ──

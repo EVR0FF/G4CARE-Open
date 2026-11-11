@@ -17,23 +17,18 @@
 #include "ColumnTypes.hh"
 #include "UnifiedSource.hh"
 #include "VolumeMaterialRegistry.hh"
-#include "TypedRegistry.hh"
 
 /// @brief Extracts material properties from the registry.
 class MaterialExtractor {
 public:
-    MaterialExtractor(VolumeMaterialRegistry* registry,
-                      TypedRegistry<std::string>* materialNameReg = nullptr,
-                      TypedRegistry<std::string>* chemicalFormulaReg = nullptr)
-        : fRegistry(registry), fMaterialNameReg(materialNameReg), fChemicalFormulaReg(chemicalFormulaReg) {}
+    MaterialExtractor(VolumeMaterialRegistry* registry)
+        : fRegistry(registry) {}
 
     [[nodiscard]] double Get(ColType type, const UnifiedSource& src, int matId) const;
     [[nodiscard]] std::string GetString(ColType type, const UnifiedSource& src) const;
 
 private:
     VolumeMaterialRegistry* fRegistry;
-    TypedRegistry<std::string>* fMaterialNameReg;
-    TypedRegistry<std::string>* fChemicalFormulaReg;
 };
 
 #endif // MATERIAL_EXTRACTOR_HH

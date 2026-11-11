@@ -1,5 +1,12 @@
 //==============================================================================
-// G4CARE cloud — email sending (SMTP in production, console in dev/demo).
+// G4CARE - mailer.ts — Cloud backend: mailer
+//
+// Cloud backend: mailer
+//
+// @author I. I. Everstov  @author V. F. Myshkin (Scientific Supervisor)
+// @date 2026-11-11  @version 0.9.3
+// @copyright Copyright (c) 2026 G4CARE Developers
+// @license SPDX-License-Identifier: Apache-2.0
 //==============================================================================
 
 import nodemailer from 'nodemailer';

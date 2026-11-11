@@ -8,7 +8,7 @@
 // @details Loads a YAML configuration file and flattens all scalar, vector,
 //   and subsection data into read-only caches for thread-safe access.
 //   Supports expression evaluation (ExrpTk), unit-aware value parsing,
-//   runtime variable injection (EXPRS↔SOURCE↔GEOMETRY), SCRIPT extraction
+//   runtime variable injection (SCRIPT.scripts ↔SOURCE↔GEOMETRY), SCRIPT extraction
 //   (:= variable, =function, =expression), and per-thread TLS caching
 //   with lazy evaluator initialization.
 //   Configuration keys read: ALL (entire YAML file is flattened)
@@ -28,6 +28,27 @@
 #include "Expression/ExpressionEvaluator.hh"
 
 class ExpressionManager;
+
+/// One OUTPUT stream definition (parsed from OUTPUT.streams[]).
+struct OutputStreamSpec {
+    std::string name;    ///< arbitrary stream name (identifier)
+    std::string level;   ///< event | track | step | digit | chemistry
+    std::vector<std::string> columns;
+    std::string filter;  ///< optional scalar filter expression
+    std::vector<std::string> filterVolumes;  ///< volume name list (map form)
+    std::string filterCondition;  ///< condition expression (map form)
+};
+
+/// Parsed OUTPUT section (columnar output configuration).
+struct OutputSpec {
+    std::string file   = "output.root";
+    std::string format = "rntuple";
+    std::string compressionAlgorithm = "zstd";  ///< none|zlib|lz4|zstd|lzma
+    int         compressionLevel     = 5;        ///< 0..9
+    int         clusterSizeMb        = 128;      ///< approx zipped cluster size (MiB)
+    int         pageSizeKb           = 1024;     ///< max unzipped page size (KiB)
+    std::vector<OutputStreamSpec> streams;
+};
 
 class ConfigManager {
 public:
@@ -95,8 +116,9 @@ public:
 
     /// @brief Direct YAML node access (only during initialization phase)
     YAML::Node GetNode(const std::string& key) const;
+    OutputSpec GetOutputSpec() const;
 
-    /// @name Runtime variables (unified namespace EXPRS↔SOURCE↔GEOMETRY)
+    /// @name Runtime variables (unified namespace SCRIPT.scripts ↔SOURCE↔GEOMETRY)
     /// @{
     static double GetRuntime(const std::string& name);
     static void SetRuntime(const std::string& name, double value);
@@ -137,6 +159,8 @@ private:
 
     /// @brief Scan flat scalars for SCRIPT declarations (:= var, = function, = expression)
     void ExtractScripts();
+    /// Parse the dedicated SCRIPT section into the same caches (leaf names).
+    void ParseScriptSection();
     /// @}
 
     /// @name Runtime helpers
@@ -149,6 +173,7 @@ private:
     /// @name YAML data (preserved for GetNode during initialization)
     /// @{
     YAML::Node fRootNode;
+    OutputSpec fOutputSpec;
     std::string fConfigFileName;
     /// @}
 

@@ -42,6 +42,9 @@
 #include "G4Trap.hh"
 #include "G4LogicalVolume.hh"
 #include "G4PVPlacement.hh"
+#include "G4PVParameterised.hh"
+#include "G4VPVParameterisation.hh"
+#include "G4RotationMatrix.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4ThreeVector.hh"
 #include "G4SDManager.hh"
@@ -64,11 +67,130 @@
 #include <algorithm>
 #include <iostream>
 #include <cctype>
+#include <cmath>
 
 namespace {
     bool IsNumber(const std::string& s) {
         std::regex number_regex(R"(^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$)");
         return std::regex_match(s, number_regex);
+    }
+
+    /// Build a G4RotationMatrix from Euler angles in degrees (X then Y then Z),
+    /// matching GEOMETRY.OVERRIDES.*.ROTATION convention. Returns nullptr when
+    /// the rotation is identity (no matrix needed).
+    G4RotationMatrix* BuildRotation(const G4ThreeVector& rotDeg) {
+        if (rotDeg.x() == 0.0 && rotDeg.y() == 0.0 && rotDeg.z() == 0.0) {
+            return nullptr;
+        }
+        G4RotationMatrix* rm = new G4RotationMatrix();
+        rm->rotateX(rotDeg.x() * CLHEP::deg);
+        rm->rotateY(rotDeg.y() * CLHEP::deg);
+        rm->rotateZ(rotDeg.z() * CLHEP::deg);
+        return rm;
+    }
+
+    // ── Array parameterisation (REPLICA.mode = linear | grid | polar). ──
+    // Geant4 requires a parameterised volume to be the ONLY daughter of a
+    // non-world mother. So the array is wrapped in a dedicated air "container"
+    // box placed in the real mother; copies are computed relative to the
+    // container centre. One G4PVParameterised + one parameterisation object
+    // replaces N individual G4PVPlacement objects (one LV, one PV, transforms
+    // computed on the fly) — far smaller memory footprint and faster
+    // voxelisation for large detector arrays.
+    struct ArrayBasis { G4ThreeVector ax, u, v; };
+
+    ArrayBasis ArrayBasisFor(char a) {
+        if (a == 'x' || a == 'X') return { G4ThreeVector(1,0,0), G4ThreeVector(0,1,0), G4ThreeVector(0,0,1) };
+        if (a == 'y' || a == 'Y') return { G4ThreeVector(0,1,0), G4ThreeVector(1,0,0), G4ThreeVector(0,0,1) };
+        return { G4ThreeVector(0,0,1), G4ThreeVector(1,0,0), G4ThreeVector(0,1,0) };
+    }
+
+    class ArrayParameterisation : public G4VPVParameterisation {
+    public:
+        ArrayParameterisation(const ReplicaDesc& r, const G4ThreeVector& center,
+                              G4RotationMatrix* baseRot)
+            : fR(r), fCenter(center), fBaseRot(baseRot),
+              fBasis(ArrayBasisFor(r.axis.empty() ? 'z' : r.axis[0])) {}
+
+        ~ArrayParameterisation() override { delete fBaseRot; }
+
+        void ComputeTransformation(const G4int copyNo, G4VPhysicalVolume* pv) const override {
+            G4ThreeVector delta;
+            G4RotationMatrix* rm = nullptr;
+
+            if (fR.mode == "grid") {
+                const int nx = std::max(1, fR.nx), ny = std::max(1, fR.ny), nz = std::max(1, fR.nz);
+                const int nxy = nx * ny;
+                const int k = copyNo / nxy;
+                const int rem = copyNo % nxy;
+                const int j = rem / nx;
+                const int i = rem % nx;
+                delta = (i * fR.dx) * fBasis.u + (j * fR.dy) * fBasis.v + (k * fR.dz) * fBasis.ax;
+                if (fBaseRot) rm = new G4RotationMatrix(*fBaseRot);
+            } else if (fR.mode == "polar") {
+                // Evenly spaced over totalAngle (count copies, no duplicate at 360°).
+                const double stepAng = (fR.count > 1) ? fR.totalAngle / fR.count : 0.0;
+                const double angRad = (fR.startAngle + copyNo * stepAng) * CLHEP::deg;
+                delta = (fR.radius * std::cos(angRad)) * fBasis.u
+                      + (fR.radius * std::sin(angRad)) * fBasis.v;
+                if (fR.rotate) {
+                    CLHEP::HepRotation rp;
+                    rp.rotate(angRad, fBasis.ax);                     // rp = R(axis, ang)
+                    const CLHEP::HepRotation base = fBaseRot ? *fBaseRot : CLHEP::HepRotation();
+                    rm = new G4RotationMatrix(rp * base);            // R(axis, ang) * R0
+                } else if (fBaseRot) {
+                    rm = new G4RotationMatrix(*fBaseRot);
+                }
+            } else { // linear
+                delta = (fR.offset + copyNo * fR.step) * fBasis.ax;
+                if (fBaseRot) rm = new G4RotationMatrix(*fBaseRot);
+            }
+
+            pv->SetTranslation(delta - fCenter);
+            pv->SetRotation(rm); // the physical volume takes ownership
+        }
+
+    private:
+        ReplicaDesc fR;
+        G4ThreeVector fCenter;
+        G4RotationMatrix* fBaseRot;
+        ArrayBasis fBasis;
+    };
+
+    // Bounding box (array frame, before obj.rot) of all copies plus the solid's
+    // half-extent; drives the container mother volume size.
+    struct ArrayExtent { G4ThreeVector center, half; };
+
+    ArrayExtent ArrayExtentFor(const ReplicaDesc& r, const G4ThreeVector& solidHalf) {
+        const ArrayBasis b = ArrayBasisFor(r.axis.empty() ? 'z' : r.axis[0]);
+        G4ThreeVector lo(0,0,0), hi(0,0,0);
+        if (r.mode == "grid") {
+            const int nx = std::max(1, r.nx), ny = std::max(1, r.ny), nz = std::max(1, r.nz);
+            const G4ThreeVector corner = ((nx-1)*r.dx)*b.u + ((ny-1)*r.dy)*b.v + ((nz-1)*r.dz)*b.ax;
+            lo = G4ThreeVector(std::min(0.0, corner.x()), std::min(0.0, corner.y()), std::min(0.0, corner.z()));
+            hi = G4ThreeVector(std::max(0.0, corner.x()), std::max(0.0, corner.y()), std::max(0.0, corner.z()));
+        } else if (r.mode == "polar") {
+            const G4ThreeVector rr = std::abs(r.radius) * (b.u + b.v);
+            lo = G4ThreeVector(-std::abs(rr.x()), -std::abs(rr.y()), -std::abs(rr.z()));
+            hi = G4ThreeVector( std::abs(rr.x()),  std::abs(rr.y()),  std::abs(rr.z()));
+        } else { // linear
+            const double e = r.offset + (std::max(1, r.count) - 1) * r.step;
+            const G4ThreeVector c = e * b.ax;
+            lo = G4ThreeVector(std::min(0.0, c.x()), std::min(0.0, c.y()), std::min(0.0, c.z()));
+            hi = G4ThreeVector(std::max(0.0, c.x()), std::max(0.0, c.y()), std::max(0.0, c.z()));
+        }
+        ArrayExtent out;
+        out.center = (lo + hi) * 0.5;
+        out.half = (hi - lo) * 0.5;
+        // Per-axis solid half-extent. Using the bounding-sphere radius here
+        // (the previous approach) made the air container span the solid's
+        // diagonal in *every* axis, so a wide/tall solid (e.g. a silicon
+        // tracker layer) produced an oversized container that overlapped
+        // neighbouring volumes (e.g. the calorimeter) and silently replaced
+        // their material with G4_AIR during navigation. The axis-aligned
+        // half-extent is the correct container size for the non-rotated case.
+        out.half += solidHalf;
+        return out;
     }
 
         std::vector<std::string> ParseSizeString(std::string input) {
@@ -95,12 +217,13 @@ namespace {
                     if (G4UnitDefinition::IsUnitDefined(unitCandidate.c_str())) {
                         result.push_back(tokens[i] + " " + unitCandidate);
                         ++i; // Skip the unit token since we appended it
-                    } else {
-                        result.push_back(tokens[i]);
+                        continue;
                     }
-                } else {
-                    result.push_back(tokens[i]);
                 }
+                // Plain number without a unit → default to millimetres. This is
+                // required because G4UIcommand::ConvertToDimensionedDouble reads an
+                // uninitialised unit buffer for unit-less strings.
+                result.push_back(tokens[i] + " mm");
             } else {
                 result.push_back(tokens[i]);
             }
@@ -141,6 +264,9 @@ void ObjectManager::CreateObjects() {
             currentDesc.name = objId;  // fallback: use YAML key as object name
         }
 
+        // Mother volume name (empty = World)
+        currentDesc.mother = cfg->GetString(baseKey + "mother", "");
+
         // GDML file: if set, shape/material/DIMENSIONS come from GDML
         currentDesc.gdmlFile = cfg->GetString(baseKey + "file", "");
 
@@ -160,12 +286,13 @@ void ObjectManager::CreateObjects() {
         currentDesc.isotope = cfg->GetString(baseKey + "isotope", "");
         currentDesc.isSensitive = cfg->GetBool(baseKey + "isSensitive", false);
         std::string digitizeBase = baseKey + "DIGITIZE.";
-        if (cfg->HasKey(digitizeBase + "dead_time_ns")) {
+        if (cfg->GetNode(baseKey + "DIGITIZE").IsDefined()) {
             currentDesc.digitizeProps.deadTime_ns = cfg->GetValueWithUnits(digitizeBase + "dead_time_ns", 0.0) / ns;
             currentDesc.digitizeProps.deadTimeModel = cfg->GetString(digitizeBase + "dead_time_model", "nonparalyzable");
             currentDesc.digitizeProps.timeResFWHM_ns = cfg->GetValueWithUnits(digitizeBase + "time_res_fwhm_ns", 0.0) / ns;
             currentDesc.digitizeProps.energyResFWHM = cfg->GetDouble(digitizeBase + "energy_res_fwhm", 0.0);
             currentDesc.digitizeProps.energyResRefEnergy_MeV = cfg->GetDouble(digitizeBase + "energy_res_ref_energy_MeV", 1.0);
+            currentDesc.digitizeProps.intrinsicResFWHM_MeV = cfg->GetValueWithUnits(digitizeBase + "intrinsic_res_fwhm_MeV", 0.0) / MeV;
             currentDesc.digitizeProps.quantumEfficiency = cfg->GetDouble(digitizeBase + "quantum_efficiency", 1.0);
             currentDesc.digitizeProps.gain = cfg->GetDouble(digitizeBase + "gain", 1.0);
             currentDesc.digitizeProps.pileupModel = cfg->GetString(digitizeBase + "pileup_model", "none");
@@ -195,13 +322,64 @@ void ObjectManager::CreateObjects() {
             currentDesc.digitizeProps.pileupEnergyExpression = cfg->GetString(digitizeBase + "pileup_energy_expression", "");
             currentDesc.digitizeProps.usePileupTimeExpression = cfg->GetBool(digitizeBase + "use_pileup_time_expression", false);
             currentDesc.digitizeProps.pileupTimeExpression = cfg->GetString(digitizeBase + "pileup_time_expression", "");
+            currentDesc.digitizeProps.useEfficiencyExpression = cfg->GetBool(digitizeBase + "use_efficiency_expression", false);
+            currentDesc.digitizeProps.efficiencyExpression = cfg->GetString(digitizeBase + "efficiency_expression", "");
+            currentDesc.digitizeProps.useGainExpression = cfg->GetBool(digitizeBase + "use_gain_expression", false);
+            currentDesc.digitizeProps.gainExpression = cfg->GetString(digitizeBase + "gain_expression", "");
+            currentDesc.digitizeProps.useNoiseExpression = cfg->GetBool(digitizeBase + "use_noise_expression", false);
+            currentDesc.digitizeProps.noiseExpression = cfg->GetString(digitizeBase + "noise_expression", "");
+            currentDesc.digitizeProps.useThresholdExpression = cfg->GetBool(digitizeBase + "use_threshold_expression", false);
+            currentDesc.digitizeProps.thresholdExpression = cfg->GetString(digitizeBase + "threshold_expression", "");
+            currentDesc.digitizeProps.useUpperThresholdExpression = cfg->GetBool(digitizeBase + "use_upper_threshold_expression", false);
+            currentDesc.digitizeProps.upperThresholdExpression = cfg->GetString(digitizeBase + "upper_threshold_expression", "");
             // Additional effects
             currentDesc.digitizeProps.darkCountRate_kHz = cfg->GetDouble(digitizeBase + "dark_count_rate_kHz", 0.0);
             currentDesc.digitizeProps.crossTalkProbability = cfg->GetDouble(digitizeBase + "cross_talk_probability", 0.0);
             currentDesc.digitizeProps.recoveryTime_ns = cfg->GetValueWithUnits(digitizeBase + "recovery_time_ns", 0.0) / ns;
+            currentDesc.digitizeProps.coincidenceWindow_ns = cfg->GetValueWithUnits(digitizeBase + "coincidence_window_ns", 0.0) / ns;
+            currentDesc.digitizeProps.spatialResFWHM_mm = cfg->GetValueWithUnits(digitizeBase + "spatial_res_fwhm_mm", 0.0) / mm;
+            currentDesc.digitizeProps.efficiencyMode = cfg->GetString(digitizeBase + "efficiency_mode", "constant");
+            currentDesc.digitizeProps.efficiencyCenter_MeV = cfg->GetDouble(digitizeBase + "efficiency_center_MeV", 0.511);
+            currentDesc.digitizeProps.efficiencyFWHM_MeV = cfg->GetDouble(digitizeBase + "efficiency_fwhm_MeV", 0.0);
+            currentDesc.digitizeProps.readoutGroup = cfg->GetInt(digitizeBase + "readout_group", -1);
+            currentDesc.digitizeProps.upperThreshold_MeV = cfg->GetValueWithUnits(digitizeBase + "upper_threshold", 0.0) / MeV;
+            currentDesc.digitizeProps.energyFrame_MeV = cfg->GetValueWithUnits(digitizeBase + "energy_frame_MeV", 0.0) / MeV;
+            currentDesc.digitizeProps.doiResolution_mm = cfg->GetValueWithUnits(digitizeBase + "doi_resolution_mm", 0.0) / mm;
+            currentDesc.digitizeProps.coincidenceMultiplicity = cfg->GetInt(digitizeBase + "coincidence_multiplicity", 2);
+            currentDesc.digitizeProps.efficiencyFile = cfg->GetString(digitizeBase + "efficiency_file", "");
+            if (!currentDesc.digitizeProps.efficiencyFile.empty()) {
+                std::ifstream ef(currentDesc.digitizeProps.efficiencyFile);
+                std::string line;
+                while (std::getline(ef, line)) {
+                    if (line.empty() || line[0] == '#') continue;
+                    std::istringstream ls(line);
+                    double e, p; if (ls >> e >> p) currentDesc.digitizeProps.efficiencyCurve.emplace_back(e, p);
+                }
+                std::sort(currentDesc.digitizeProps.efficiencyCurve.begin(), currentDesc.digitizeProps.efficiencyCurve.end());
+            }
             // Detector type
             currentDesc.digitizeProps.calorimeterMode = cfg->GetBool(digitizeBase + "calorimeter_mode", false);
             currentDesc.digitizeProps.digitType = cfg->GetInt(digitizeBase + "digit_type", -1);
+            // Configurable singles pipeline (ordered step names; empty = default order)
+            currentDesc.digitizeProps.pipeline = cfg->GetStringVector(digitizeBase + "pipeline");
+            // GATE-parity enhancements
+            currentDesc.digitizeProps.crossTalkFraction = cfg->GetDouble(digitizeBase + "cross_talk_fraction", 0.0);
+            currentDesc.digitizeProps.crossTalkNeighbors = cfg->GetIntVector(digitizeBase + "cross_talk_neighbors", {1});
+            currentDesc.digitizeProps.darkCountEnergy_MeV = cfg->GetValueWithUnits(digitizeBase + "dark_count_energy_MeV", 1.0) / MeV;
+            currentDesc.digitizeProps.coincidenceMinSectorDiff = cfg->GetInt(digitizeBase + "coincidence_min_sector_diff", 0);
+            currentDesc.digitizeProps.coincidenceMultiplesPolicy = cfg->GetString(digitizeBase + "coincidence_multiples_policy", "reject");
+            currentDesc.digitizeProps.readoutPolicy = cfg->GetString(digitizeBase + "readout_policy", "energy_winner");
+            // Light-yield energy resolution model (GATE intrinsic resolution)
+            currentDesc.digitizeProps.lightYield = cfg->GetDouble(digitizeBase + "light_yield", 0.0);
+            currentDesc.digitizeProps.transferEfficiency = cfg->GetDouble(digitizeBase + "transfer_efficiency", 1.0);
+            currentDesc.digitizeProps.intrinsicResFWHM_frac = cfg->GetDouble(digitizeBase + "intrinsic_res_fwhm", 0.0);
+            currentDesc.digitizeProps.intrinsicResRefEnergy_MeV = cfg->GetDouble(digitizeBase + "intrinsic_res_ref_energy_MeV", 1.0);
+            // Dead-time buffer + confined spatial resolution
+            currentDesc.digitizeProps.deadTimeBufferSize = cfg->GetInt(digitizeBase + "dead_time_buffer_size", 0);
+            currentDesc.digitizeProps.spatialConfine = cfg->GetBool(digitizeBase + "spatial_confine", false);
+            currentDesc.digitizeProps.spatialHalfX_mm = cfg->GetValueWithUnits(digitizeBase + "spatial_half_x_mm", 0.0) / mm;
+            currentDesc.digitizeProps.spatialHalfY_mm = cfg->GetValueWithUnits(digitizeBase + "spatial_half_y_mm", 0.0) / mm;
+            currentDesc.digitizeProps.spatialHalfZ_mm = cfg->GetValueWithUnits(digitizeBase + "spatial_half_z_mm", 0.0) / mm;
         }
 
         // Dimensions: try DIMENSIONS vector first (new format), then size (legacy)
@@ -239,6 +417,14 @@ void ObjectManager::CreateObjects() {
             currentDesc.pos.setX(cfg->GetValueWithUnits(baseKey + "pos.x", 0.0));
             currentDesc.pos.setY(cfg->GetValueWithUnits(baseKey + "pos.y", 0.0));
             currentDesc.pos.setZ(cfg->GetValueWithUnits(baseKey + "pos.z", 0.0));
+        }
+
+        // Rotation: ROTATION vector [x, y, z] Euler angles in degrees
+        auto rotDblVec = cfg->GetDoubleVector(baseKey + "ROTATION");
+        if (rotDblVec.size() >= 3) {
+            currentDesc.rot.setX(rotDblVec[0]);
+            currentDesc.rot.setY(rotDblVec[1]);
+            currentDesc.rot.setZ(rotDblVec[2]);
         }
         
         std::string cutsPath = "GEOMETRY.OBJECTS." + objId + ".cuts";
@@ -287,13 +473,25 @@ void ObjectManager::CreateObjects() {
             }
         }
 
-        // REPLICA configuration
+        // REPLICA configuration (linear / grid / polar).
         std::string replicaBase = baseKey + "REPLICA.";
-        if (cfg->HasKey(replicaBase + "count")) {
-            currentDesc.replica.count = cfg->GetInt(replicaBase + "count", 0);
+        if (cfg->HasKey(replicaBase + "count") || cfg->HasKey(replicaBase + "nx")
+            || cfg->HasKey(replicaBase + "radius")) {
+            currentDesc.replica.mode = cfg->GetString(replicaBase + "mode", "linear");
             currentDesc.replica.axis = cfg->GetString(replicaBase + "axis", "z");
+            currentDesc.replica.count = cfg->GetInt(replicaBase + "count", 0);
             currentDesc.replica.step = cfg->GetValueWithUnits(replicaBase + "step", 0.0);
             currentDesc.replica.offset = cfg->GetValueWithUnits(replicaBase + "offset", 0.0);
+            currentDesc.replica.nx = cfg->GetInt(replicaBase + "nx", 0);
+            currentDesc.replica.ny = cfg->GetInt(replicaBase + "ny", 0);
+            currentDesc.replica.nz = cfg->GetInt(replicaBase + "nz", 0);
+            currentDesc.replica.dx = cfg->GetValueWithUnits(replicaBase + "dx", 0.0);
+            currentDesc.replica.dy = cfg->GetValueWithUnits(replicaBase + "dy", 0.0);
+            currentDesc.replica.dz = cfg->GetValueWithUnits(replicaBase + "dz", 0.0);
+            currentDesc.replica.radius = cfg->GetValueWithUnits(replicaBase + "radius", 0.0);
+            currentDesc.replica.startAngle = cfg->GetDouble(replicaBase + "startAngle", 0.0);
+            currentDesc.replica.totalAngle = cfg->GetDouble(replicaBase + "totalAngle", 360.0);
+            currentDesc.replica.rotate = cfg->GetBool(replicaBase + "rotate", false);
         }
 
         // CHILDREN — parse nested objects recursively
@@ -326,9 +524,16 @@ void ObjectManager::CreateObjects() {
                 childDesc.pos.setZ(childPos[2]);
             }
 
+            auto childRot = cfg->GetDoubleVector(childKey + "ROTATION");
+            if (childRot.size() >= 3) {
+                childDesc.rot.setX(childRot[0]);
+                childDesc.rot.setY(childRot[1]);
+                childDesc.rot.setZ(childRot[2]);
+            }
+
             // DIGITIZE for child
             std::string childDigi = childKey + "DIGITIZE.";
-            if (cfg->HasKey(childDigi + "digit_type")) {
+            if (cfg->GetNode(childKey + "DIGITIZE").IsDefined()) {
                 childDesc.digitizeProps.digitType = cfg->GetInt(childDigi + "digit_type", -1);
                 childDesc.digitizeProps.threshold_MeV = cfg->GetValueWithUnits(childDigi + "threshold", 0.0) / MeV;
                 childDesc.digitizeProps.quantumEfficiency = cfg->GetDouble(childDigi + "quantum_efficiency", 1.0);
@@ -347,7 +552,9 @@ void ObjectManager::CreateObjects() {
         fObjects.push_back(currentDesc);
         fIndexMap[currentDesc.name] = fObjects.size() - 1;
         G4cout << "ObjectManager: Added object '" << currentDesc.name << "' (id=" << objId
-               << ", replica=" << (currentDesc.replica.count > 0 ? "yes" : "no")
+               << ", replica=" << (currentDesc.replica.count > 0
+                                    || currentDesc.replica.nx > 0
+                                    || currentDesc.replica.radius > 0.0 ? "yes" : "no")
                << ", children=" << currentDesc.children.size() << ")" << G4endl;
 
     }
@@ -460,8 +667,9 @@ void ObjectManager::PlaceObjects(G4LogicalVolume* mother) {
             }
 
             // Place GDML logical volume at YAML-specified position
+            G4RotationMatrix* rotMatrix = BuildRotation(obj.rot);
             G4VPhysicalVolume* physVol = new G4PVPlacement(
-                nullptr, obj.pos, lvolFromGDML, obj.name,
+                rotMatrix, obj.pos, lvolFromGDML, obj.name,
                 actualMother, false, copyNo++);
             obj.physicalVolume = physVol;
 
@@ -646,6 +854,7 @@ void ObjectManager::PlaceObjects(G4LogicalVolume* mother) {
 
         G4LogicalVolume* lvol = new G4LogicalVolume(solid, mat, obj.name + "_LV");
         
+        obj.solid = solid;
         obj.logicalVolume = lvol;
 
         G4LogicalVolume* actualMother = mother;
@@ -686,42 +895,66 @@ void ObjectManager::PlaceObjects(G4LogicalVolume* mother) {
             }
         }
 
-        // REPLICA placement
-        if (obj.replica.count > 0 && !obj.replica.axis.empty()) {
-            char axis = obj.replica.axis[0];
-            G4cout << "ObjectManager: placing " << obj.replica.count
-                   << " replicas of '" << obj.name << "' (axis=" << obj.replica.axis
-                   << ", step=" << obj.replica.step/mm << " mm)" << G4endl;
-            for (int i = 0; i < obj.replica.count; i++) {
-                double offset = obj.replica.offset + i * obj.replica.step;
-                G4ThreeVector replicaPos = obj.pos;
-                if (axis == 'x' || axis == 'X') replicaPos.setX(replicaPos.x() + offset);
-                else if (axis == 'y' || axis == 'Y') replicaPos.setY(replicaPos.y() + offset);
-                else replicaPos.setZ(replicaPos.z() + offset);
-
-                G4VPhysicalVolume* physVol = new G4PVPlacement(
-                    nullptr, replicaPos, lvol, obj.name,
-                    actualMother, false, i);
-                if (i == 0) obj.physicalVolume = physVol;
-
-                // Place children inside each replica
-                for (auto& child : obj.children) {
-                    if (!child.logicalVolume) continue;
-                    new G4PVPlacement(nullptr, child.pos, child.logicalVolume,
-                        child.name, lvol, false, i);
-                }
+        // ── Placement: array (REPLICA) or single ──
+        // Arrays are built as a single G4PVParameterised volume (one LV, one PV,
+        // N copies computed by ArrayParameterisation) instead of a loop of
+        // G4PVPlacement objects — much smaller memory footprint and faster
+        // voxelisation for large detector arrays.
+        const ReplicaDesc& rep = obj.replica;
+        int nCopies = 0;
+        const bool isGrid = (rep.mode == "grid");
+        const bool hasArray = !rep.axis.empty()
+            && (isGrid ? (rep.nx > 0 && rep.ny > 0) : rep.count > 0);
+        if (hasArray) {
+            if (isGrid) {
+                const int nx = std::max(1, rep.nx), ny = std::max(1, rep.ny), nz = std::max(1, rep.nz);
+                nCopies = nx * ny * nz;
+            } else {
+                nCopies = rep.count; // linear + polar
             }
-        } else {
-            // Single placement (no replica)
-            G4VPhysicalVolume* physVol = new G4PVPlacement(nullptr, obj.pos, lvol, obj.name, actualMother, false, copyNo++);
+        }
+
+        // Place children once in the shared LV — they appear in every array copy
+        // automatically (all copies share the same logical volume).
+        for (auto& child : obj.children) {
+            if (!child.logicalVolume) continue;
+            G4RotationMatrix* childRot = BuildRotation(child.rot);
+            new G4PVPlacement(childRot, child.pos, child.logicalVolume,
+                              child.name, lvol, false, 0);
+        }
+
+        if (nCopies > 0) {
+            // Solid half-extent (drives the container size).
+            G4ThreeVector solidHalf(1 * mm, 1 * mm, 1 * mm);
+            if (obj.solid) {
+                G4ThreeVector pMin, pMax;
+                obj.solid->BoundingLimits(pMin, pMax);
+                solidHalf = (pMax - pMin) * 0.5;
+            }
+            const ArrayExtent ext = ArrayExtentFor(rep, solidHalf);
+
+            // Dedicated air container mother (must be non-world and have the
+            // parameterised volume as its only daughter).
+            auto* contSolid = new G4Box(obj.name + "_ArrayContainer",
+                                        ext.half.x(), ext.half.y(), ext.half.z());
+            G4Material* air = G4NistManager::Instance()->FindOrBuildMaterial("G4_AIR");
+            auto* contLV = new G4LogicalVolume(contSolid, air, obj.name + "_ArrayContainer_LV");
+            const G4ThreeVector contPos = obj.pos + ext.center;
+            new G4PVPlacement(nullptr, contPos, contLV, obj.name + "_ArrayContainer",
+                              actualMother, false, copyNo++);
+
+            G4RotationMatrix* baseRot = BuildRotation(obj.rot);
+            auto* param = new ArrayParameterisation(rep, ext.center, baseRot);
+            auto* physVol = new G4PVParameterised(obj.name, lvol, contLV,
+                                                 kUndefined, nCopies, param);
             obj.physicalVolume = physVol;
-
-            // Place children in single parent
-            for (auto& child : obj.children) {
-                if (!child.logicalVolume) continue;
-                new G4PVPlacement(nullptr, child.pos, child.logicalVolume, child.name, lvol, false, 0);
-            }
-
+            G4cout << "ObjectManager: placed array '" << obj.name << "' (mode=" << rep.mode
+                   << ", copies=" << nCopies << ", axis=" << rep.axis << ") in container '"
+                   << obj.name << "_ArrayContainer'" << G4endl;
+        } else {
+            G4RotationMatrix* rotMatrix = BuildRotation(obj.rot);
+            G4VPhysicalVolume* physVol = new G4PVPlacement(rotMatrix, obj.pos, lvol, obj.name, actualMother, false, copyNo++);
+            obj.physicalVolume = physVol;
             G4cout << "ObjectManager: placed object '" << obj.name << "' at ("
                    << G4BestUnit(obj.pos.x(),"Length") << ", "
                    << G4BestUnit(obj.pos.y(),"Length") << ", "

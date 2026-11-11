@@ -12,6 +12,7 @@ endif()
 find_package(Geant4 REQUIRED ui_all vis_all)
 find_package(ROOT REQUIRED)
 find_package(TBB REQUIRED)
+find_package(ZLIB REQUIRED)
 
 # ── Optional DICOM import (GDCM) ────────────────────────────────────────────
 option(G4CARE_WITH_DICOM "Enable GDCM-based DICOM import (CT phantom, RTSTRUCT, RTPLAN, RTDOSE)" OFF)
@@ -42,35 +43,52 @@ file(GLOB_RECURSE SOURCES ${PROJECT_SOURCE_DIR}/src/*.cc ${PROJECT_SOURCE_DIR}/s
 
 file(GLOB_RECURSE HEADERS ${PROJECT_SOURCE_DIR}/include/*.hh)
 
-add_executable(G4CARE ${SOURCES} ${HEADERS})
+# Entry points (thin wrappers) are not part of the engine library.
+list(REMOVE_ITEM SOURCES
+    ${PROJECT_SOURCE_DIR}/src/main.cc
+    ${PROJECT_SOURCE_DIR}/src/Core/engine_main.cc)
 
-target_include_directories(G4CARE PRIVATE ${PROJECT_SOURCE_DIR}/include)
+# ── Engine static library ────────────────────────────────────────────────────
+add_library(g4care_engine STATIC ${SOURCES} ${HEADERS})
 
-target_link_libraries(G4CARE 
-    ${Geant4_LIBRARIES}
+target_include_directories(g4care_engine PUBLIC
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/third_party)
+
+target_link_libraries(g4care_engine PUBLIC
     ${Geant4_LIBRARIES}
     ${ROOT_LIBRARIES}
     ROOT::ROOTDataFrame
     ROOT::ROOTNTuple
     yaml-cpp
+    ZLIB::ZLIB
 )
 
 if(G4CARE_WITH_DICOM)
-    target_include_directories(G4CARE PRIVATE ${GDCM_INCLUDE_DIRS})
+    target_include_directories(g4care_engine PRIVATE ${GDCM_INCLUDE_DIRS})
     # GDCM's install-tree config leaves GDCM_LIBRARIES empty; link the imported
     # targets directly. gdcmMSFF transitively pulls gdcmIOD/DSED/DICT/Common.
-    target_link_libraries(G4CARE gdcmMSFF gdcmMEXD)
-    target_compile_definitions(G4CARE PRIVATE G4CARE_HAS_DICOM)
+    target_link_libraries(g4care_engine PUBLIC gdcmMSFF gdcmMEXD)
+    target_compile_definitions(g4care_engine PUBLIC G4CARE_HAS_DICOM)
 endif()
 
-target_compile_options(G4CARE PRIVATE 
+target_compile_options(g4care_engine PRIVATE
     $<$<CONFIG:Release>:-O2 -DNDEBUG>
     $<$<CONFIG:Debug>:-g -O0>
 )
 
-target_compile_features(G4CARE PRIVATE cxx_std_20)
+target_compile_features(g4care_engine PUBLIC cxx_std_20)
 
-set_target_properties(G4CARE PROPERTIES
-    INSTALL_RPATH "/usr/lib/x86_64-linux-gnu"
-    BUILD_WITH_INSTALL_RPATH TRUE
-)
+# ── CLI executable (thin wrapper) ────────────────────────────────────────────
+add_executable(G4CARE ${PROJECT_SOURCE_DIR}/src/main.cc)
+target_link_libraries(G4CARE g4care_engine)
+
+# ── RPC sidecar executable ───────────────────────────────────────────────────
+add_executable(g4care-engine ${PROJECT_SOURCE_DIR}/src/Core/engine_main.cc)
+target_link_libraries(g4care-engine g4care_engine)
+
+foreach(_exe G4CARE g4care-engine)
+    set_target_properties(${_exe} PROPERTIES
+        INSTALL_RPATH "/usr/lib/x86_64-linux-gnu"
+        BUILD_WITH_INSTALL_RPATH TRUE)
+endforeach()

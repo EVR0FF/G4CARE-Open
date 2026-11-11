@@ -7,8 +7,8 @@
 // @brief   Manager for multiple particle sources with weighted mixing
 // @details Owns a collection of Source objects and dispatches event
 //   generation across them. Supports two modes:
-//   - kFlow: each event uses one source selected by weight
-//   - kEvent: all sources fire per event (cumulative primary generation)
+//   - kFlow: all sources fire per event (cumulative primary generation)
+//   - kEvent: one source per event, selected by weight
 //   Maintains cumulative weights for efficient weighted random selection.
 // @author  I. I. Everstov
 // @author  V. F. Myshkin (Scientific Supervisor)
@@ -27,8 +27,8 @@ class SourceManager {
 public:
     /// @brief Source mixing mode
     enum class SourceMode {
-        kFlow,   ///< One source per event, selected by weight
-        kEvent   ///< All sources fire per event
+        kFlow,   ///< All sources fire per event (cumulative primary generation)
+        kEvent   ///< One source per event, selected by weight
     };
 
     /// @brief Default constructor

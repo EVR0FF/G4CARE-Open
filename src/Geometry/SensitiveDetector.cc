@@ -20,6 +20,7 @@
 #endif
 #include "Hit.hh"
 #include "SensitiveDetector.hh"
+#include "DoseScorer.hh"
 #include "BeamAnalysis.hh"
 #include "G4RunManager.hh"
 #include "G4Event.hh"
@@ -46,6 +47,7 @@ SensitiveDetector::~SensitiveDetector() {}
 G4VSensitiveDetector* SensitiveDetector::Clone() const {
     auto* clone = new SensitiveDetector(SensitiveDetectorName);
     clone->collectionName = collectionName;
+    clone->fDoseScoring = fDoseScoring;
     return clone;
 }
 
@@ -56,8 +58,7 @@ G4VSensitiveDetector* SensitiveDetector::Clone() const {
 /// @param hce Handle for the hit collection of this event
 void SensitiveDetector::Initialize(G4HCofThisEvent* hce) {
     fHitsCollection = new HitsCollection(fDetectorName, collectionName[0]);
-    static G4int hcID = -1;
-    if (hcID < 0) hcID = GetCollectionID(0);
+    G4int hcID = GetCollectionID(0);
     hce->AddHitsCollection(hcID, fHitsCollection);
 }
 
@@ -91,6 +92,11 @@ G4bool SensitiveDetector::ProcessHits(G4Step* step, G4TouchableHistory*) {
     // For a voxel phantom (G4PVParameterised) the copy number at level 0 is
     // the voxel index (iz*(nx*ny) + iy*nx + ix).
     if (depth >= 1) hit->SetVoxelIndex(touchable->GetReplicaNumber(0));
+    if (fDoseScoring && depth >= 1) {
+        // Exact voxel-indexed RTDOSE accumulation (matches the CTSeries linear
+        // index iz*(nx*ny) + iy*nx + ix of the phantom voxel parameterisation).
+        DoseScorer::Instance()->DepositVoxel(touchable->GetReplicaNumber(0), edep);
+    }
     // isXPlane is inferred from volume name convention (X-plane has capital X in name)
     G4String volName = touchable->GetVolume(0)->GetName();
     hit->SetIsXPlane((volName.find("X") != std::string::npos && volName.find("Y") == std::string::npos) ? 1 : 0);

@@ -13,7 +13,6 @@ VISUALIZATION: false
 OUTPUT_FILE: "test_xray_tes.root"
 G4RUNMANAGER_PRINT_PROGRESS: 100
 SEED: [123, 2004]
-ENABLE_DICTIONARY: false
 
 GEOMETRY:
   FILE: "xray_TESdetector.gdml"
@@ -69,19 +68,20 @@ NTUPLE:
       - "theta"
       - "phi"
 
-EXPRS:
-  - NAME: "total_edep"
-    VOLUME: "*"
-    EXCLUDE:
-      - "*Shield*"
-      - "*Cryostat*"
-      - "expHall*"
-    N_RUN: 1
-    SCRIPT: |
-      g4cout('EXPRS total edep (detector)=', edep, ' MeV');
-  - NAME: "bipxl_edep"
-    VOLUME: "Bipxl_log"
-    N_RUN: 1
-    SCRIPT: |
-      g4cout('EXPRS Bipxl edep =', edep, ' MeV');
-      
+SCRIPT:
+  scripts:
+    - NAME: "total_edep"
+      VOLUME: "*"
+      EXCLUDE:
+        - "*Shield*"
+        - "*Cryostat*"
+        - "expHall*"
+      N_RUN: 1
+      SCRIPT: |
+        g4cout('SCRIPT total edep (detector)=', edep, ' MeV');
+    - NAME: "bipxl_edep"
+      VOLUME: "Bipxl_log"
+      N_RUN: 1
+      SCRIPT: |
+        g4cout('SCRIPT Bipxl edep =', edep, ' MeV');
+        

@@ -1,0 +1,8 @@
+Liver Ultrasound — B-mode Liver Mass Study
+Source collection: Ultrasound data of a variety of liver masses (B-mode-and-CEUS-Liver)
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Data citation:
+Eisenbrey, J., Lyshchik, A., & Wessner, C. (2021). Ultrasound data of a variety of liver masses [Data set]. The Cancer Imaging Archive. https://doi.org/10.7937/TCIA.2021.v4z7-tc39
+
+Redistributed by Saga IT (saga-it.com/dicom/samples) under the Creative Commons Attribution license above. Sourced from the NCI Imaging Data Commons (portal.imaging.datacommons.cancer.gov).

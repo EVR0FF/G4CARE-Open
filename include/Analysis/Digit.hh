@@ -23,6 +23,7 @@
 #include "G4TDigiCollection.hh"
 #include "G4Allocator.hh"
 #include "G4ThreeVector.hh"
+#include "G4Threading.hh"
 
 /// @brief Digitized detector signal with full metadata.
 class Digit : public G4VDigi {
@@ -30,7 +31,7 @@ public:
     Digit();
     virtual ~Digit();
 
-    static G4Allocator<Digit>* fAllocator;
+    static G4ThreadLocal G4Allocator<Digit>* fAllocator;
     void* operator new(size_t);
     void operator delete(void*);
 
@@ -51,6 +52,7 @@ public:
     void SetQuantumEfficiency(G4double qe) { fQuantumEfficiency = qe; }
     void SetNoiseEnergy(G4double e) { fNoiseEnergy = e; }
     void SetDigitType(G4int t) { fDigitType = t; }
+    void SetCoincidenceID(G4int id) { fCoincidenceID = id; }
 
     // Getters
     G4int GetDetectorID() const { return fDetectorID; }
@@ -67,6 +69,7 @@ public:
     G4double GetNoiseEnergy() const { return fNoiseEnergy; }
     G4int GetDigitType() const { return fDigitType; }
 
+    G4int GetCoincidenceID() const { return fCoincidenceID; }
 private:
     G4int fDetectorID;
     G4double fTime;
@@ -81,6 +84,7 @@ private:
     G4bool fAfterpulse;
     G4double fQuantumEfficiency;
     G4double fNoiseEnergy;
+    G4int fCoincidenceID = -1;
     G4int fDigitType = -1;
 };
 

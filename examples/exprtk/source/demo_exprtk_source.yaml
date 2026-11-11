@@ -14,7 +14,6 @@ NTHREADS: 4
 OUTPUT_FILE: "demo_exprtk_source.root"
 EVENTS: 12
 VISUALIZATION: false
-ENABLE_DICTIONARY: false
 
 GEOMETRY:
   WORLD:

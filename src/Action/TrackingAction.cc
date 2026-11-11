@@ -16,12 +16,12 @@
 //     for later recording in the "activation" NTuple by EventAction.
 //
 //   PostUserTrackingAction():
-//   - Executes track-level ExprTK scripts via ExprsManager if EXPRS
+//   - Executes track-level ExprTK scripts via ScriptsManager if SCRIPT.scripts
 //     blocks are active and the track ended in a recognised volume.
 //     Builds FilterVars from the track data via DataExtractor.
 //
 //   Configuration keys read: none (uses registered volumes from
-//   GeometryManager and active EXPRS blocks from ConfigManager).
+//   GeometryManager and active SCRIPT.scripts from ConfigManager).
 //
 // @author  I. I. Everstov
 // @author  V. F. Myshkin (Scientific Supervisor)
@@ -36,7 +36,7 @@
 
 #include "TrackingAction.hh"
 #include "BeamAnalysis.hh"
-#include "ExprsManager.hh"
+#include "ScriptsManager.hh"
 #include "G4Track.hh"
 #include "G4Step.hh"
 #include "G4StepPoint.hh"
@@ -48,6 +48,8 @@
 #include "UnifiedSource.hh"
 #include "FilterVarRegistry.hh"
 #include "DataExtractor.hh"
+
+std::atomic<unsigned long long> TrackingAction::sTrackCount{0};
 
 TrackingAction::TrackingAction() : G4UserTrackingAction() {}
 
@@ -61,6 +63,8 @@ TrackingAction::TrackingAction() : G4UserTrackingAction() {}
 /// mass, and lifetime are recorded in the "activation" NTuple by
 /// EventAction::EndOfEventAction().
 void TrackingAction::PreUserTrackingAction(const G4Track* track) {
+
+    sTrackCount.fetch_add(1, std::memory_order_relaxed);
 
     BeamAnalysis::Instance()->Fill("secondary", track);
 
@@ -87,13 +91,13 @@ void TrackingAction::PreUserTrackingAction(const G4Track* track) {
 ///
 /// @param track Pointer to the G4Track that has just ended.
 ///
-/// If EXPRS blocks are active, attempts to determine the logical volume
+/// If SCRIPT.scripts are active, attempts to determine the logical volume
 /// where the track ended (via NextVolume or initial Touchable).  Builds
 /// FilterVars from the track data and executes track-level ExprTK scripts
-/// via ExprsManager::TryExecuteTrackScripts().
+/// via ScriptsManager::TryExecuteTrackScripts().
 void TrackingAction::PostUserTrackingAction(const G4Track* track) {
     if (!track) return;
-    auto* sm = ExprsManager::Instance();
+    auto* sm = ScriptsManager::Instance();
     if (sm->GetBlocks().empty()) return;
 
     // Obtain the logical volume where the track ended.
@@ -116,6 +120,7 @@ void TrackingAction::PostUserTrackingAction(const G4Track* track) {
     auto* de = BeamAnalysis::Instance()->GetDataExtractor();
     if (de) {
         de->BuildFilterVars(filterVars, src, -1, -1, -1, nullptr);
+        ScriptsManager::SetNameContext(track->GetParticleDefinition()->GetParticleName(), "");
         sm->TryExecuteTrackScripts(lv, filterVars);
     }
 }

@@ -106,6 +106,8 @@ enum class ColType {
 
     // ========== 11. Sources and detectors ==========
     SourceName, DetectorName, DetectorID, DigitType,
+    DigitEnergy,
+    CoincidenceID,
     RawEnergy,
     RawTime,
     PileupSize,
@@ -113,6 +115,7 @@ enum class ColType {
     Afterpulse,
     QuantumEfficiency,
     NoiseEnergy,
+    HitEdep, StripNumber, PlaneNumber, IsXPlane,
 
     // ========== 12. Cross sections ==========
     NeutronTotalXS, NeutronCaptureXS, NeutronElasticXS,

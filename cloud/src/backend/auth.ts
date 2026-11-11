@@ -1,8 +1,12 @@
 //==============================================================================
-// G4CARE cloud — authentication helpers (password hashing + HMAC JWT).
+// G4CARE - auth.ts — Cloud backend: authentication
 //
-// Self-contained (no external JWT dependency): HS256-signed tokens using
-// node:crypto. Passwords hashed with scrypt.
+// Cloud backend: authentication
+//
+// @author I. I. Everstov  @author V. F. Myshkin (Scientific Supervisor)
+// @date 2026-11-11  @version 0.9.3
+// @copyright Copyright (c) 2026 G4CARE Developers
+// @license SPDX-License-Identifier: Apache-2.0
 //==============================================================================
 
 import { createHmac, scryptSync, randomBytes, timingSafeEqual } from 'node:crypto';

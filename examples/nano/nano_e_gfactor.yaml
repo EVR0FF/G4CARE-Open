@@ -9,7 +9,6 @@ OUTPUT_FILE: "nano_e_gfactor.root"
 G4RUNMANAGER_PRINT_PROGRESS: 100
 EVENTS: 0
 VISUALIZATION: true
-ENABLE_DICTIONARY: false
 RUNACTION_VERBOSE: 1
 
 # ── Материалы ──
@@ -301,23 +300,24 @@ NTUPLE:
       - "edep"
       - "volume_name"
 
-EXPRS:
-  - NAME: "ChemRefTest"
-    VOLUME: ["water1", "water2", "water3", "water4"]
-    SCRIPT: |
-      g4cout('[SCORING] Chemistry @ t=', chem_end_ns, ' ns, edep=', chem_edep_eV, ' eV:');
-      g4cout('  Species    N_created    N_at_end  charge');
-      var total_q := 0;
-      for (var i := 0; i < chem_n_species; i += 1) {
-        var nCr := Nc[i];
-        var nAt := Nt[i];
-        var spQ := nAt * charge[i];
-        total_q += spQ;
-        g4cout('  ', species_name(i), ' ', nCr, ' ', nAt, ' ', spQ);
-      }
-      g4cout('[SCORING] TOTAL charge = ', total_q,
-              if(abs(total_q) < 0.001, ' (NEUTRAL)', ' (VIOLATION!)'));
-      var E_J := chem_edep_eV * 1.602176634e-19;
-      var my_dose_Gy := if(volume_mass > 0, E_J / volume_mass, 0);
-      g4cout('[SCORING] EDep=', chem_edep_eV, ' eV, mass=', volume_mass, ' kg, dose=', my_dose_Gy/1e6, ' MGy');
+SCRIPT:
+  scripts:
+    - NAME: "ChemRefTest"
+      VOLUME: ["water1", "water2", "water3", "water4"]
+      SCRIPT: |
+        g4cout('[SCORING] Chemistry @ t=', chem_end_ns, ' ns, edep=', chem_edep_eV, ' eV:');
+        g4cout('  Species    N_created    N_at_end  charge');
+        var total_q := 0;
+        for (var i := 0; i < chem_n_species; i += 1) {
+          var nCr := Nc[i];
+          var nAt := Nt[i];
+          var spQ := nAt * charge[i];
+          total_q += spQ;
+          g4cout('  ', species_name(i), ' ', nCr, ' ', nAt, ' ', spQ);
+        }
+        g4cout('[SCORING] TOTAL charge = ', total_q,
+                if(abs(total_q) < 0.001, ' (NEUTRAL)', ' (VIOLATION!)'));
+        var E_J := chem_edep_eV * 1.602176634e-19;
+        var my_dose_Gy := if(volume_mass > 0, E_J / volume_mass, 0);
+        g4cout('[SCORING] EDep=', chem_edep_eV, ' eV, mass=', volume_mass, ' kg, dose=', my_dose_Gy/1e6, ' MGy');
 

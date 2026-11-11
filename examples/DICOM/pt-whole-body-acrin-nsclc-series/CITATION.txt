@@ -1,0 +1,8 @@
+Whole-Body PET — ACRIN 6668 NSCLC FDG-PET
+Source collection: ACRIN-NSCLC-FDG-PET (ACRIN 6668 Trial)
+License: CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/)
+
+Data citation:
+Kinahan, P., Muzi, M., Bialecki, B., Herman, B., & Coombs, L. (2019). Data from the ACRIN 6668 Trial NSCLC-FDG-PET (Version 2) [Data set]. The Cancer Imaging Archive. https://doi.org/10.7937/tcia.2019.30ilqfcl
+
+Redistributed by Saga IT (saga-it.com/dicom/samples) under the Creative Commons Attribution license above. Sourced from the NCI Imaging Data Commons (portal.imaging.datacommons.cancer.gov).

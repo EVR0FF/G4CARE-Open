@@ -167,6 +167,7 @@ void PhysicsManager::RegisterUserCrossSection(
 
 G4VModularPhysicsList* PhysicsManager::CreateBaseList(const G4String& baseName) {
     G4PhysListFactory factory;
+    factory.SetVerbose(ConfigManager::Instance()->GetInt("VERBOSITY", 0));
     if (!factory.IsReferencePhysList(baseName)) {
         G4Exception("PhysicsManager::CreateBaseList", "InvalidBaseList", FatalException,
                     ("Requested physics list '" + baseName + "' not found.").c_str());
@@ -470,6 +471,7 @@ G4VModularPhysicsList* PhysicsManager::CreatePhysicsList() {
         if (!physList) return nullptr;
         G4cout << "PhysicsManager: Base physics list created: " << fBaseListName << G4endl;
     }
+    physList->SetVerboseLevel(ConfigManager::Instance()->GetInt("VERBOSITY", 0));
 
     if (!fBaseMacro.empty()) {
         G4UImanager* ui = G4UImanager::GetUIpointer();

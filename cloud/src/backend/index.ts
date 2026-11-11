@@ -1,9 +1,12 @@
 //==============================================================================
-// G4CARE cloud — metadata index (JSON-file implementation).
+// G4CARE - index.ts — Cloud backend: entry point
 //
-// MVP: a JSON array persisted to disk, loaded into memory. The production path
-// uses PostgreSQL (see migrations/001_init.sql) — the `list`/`get`/`insert`
-// contract stays the same.
+// Cloud backend: entry point
+//
+// @author I. I. Everstov  @author V. F. Myshkin (Scientific Supervisor)
+// @date 2026-11-11  @version 0.9.3
+// @copyright Copyright (c) 2026 G4CARE Developers
+// @license SPDX-License-Identifier: Apache-2.0
 //==============================================================================
 
 import { readFile, writeFile } from 'node:fs/promises';

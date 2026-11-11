@@ -14,10 +14,10 @@
 //   "activation" table.
 //
 //   PostUserTrackingAction() executes track-level ExprTK scripts via
-//   ExprsManager when the track ends in a recognised logical volume.
+//   ScriptsManager when the track ends in a recognised logical volume.
 //
 //   Configuration keys read: none (uses GeometryManager-stored volumes
-//   and active EXPRS blocks from ConfigManager).
+//   and active SCRIPT.scripts from ConfigManager).
 //
 // @author  I. I. Everstov
 // @author  V. F. Myshkin (Scientific Supervisor)
@@ -37,6 +37,7 @@
 #include "globals.hh"
 #include "G4LogicalVolume.hh"  
 
+#include <atomic>
 #include <unordered_map>
 
 class BeamAnalysis;
@@ -45,7 +46,7 @@ class BeamAnalysis;
 ///
 /// At track start, records data in "secondary" and "ion_production" NTuple
 /// trees and accumulates isotope information.  At track end, executes
-/// track-level ExprTK scripts for volumes with active EXPRS blocks.
+/// track-level ExprTK scripts for volumes with active SCRIPT.scripts.
 class TrackingAction : public G4UserTrackingAction {
 public:
     TrackingAction();
@@ -57,10 +58,19 @@ public:
     virtual void PreUserTrackingAction(const G4Track* track) override;
 
     /// @brief Called after a track has finished.
-    ///        Executes track-level ExprTK scripts if EXPRS blocks exist.
+    ///        Executes track-level ExprTK scripts if SCRIPT.scripts exist.
     virtual void PostUserTrackingAction(const G4Track* track) override;
 
+    /// @brief Total number of tracks across all threads (lock-free counter).
+    static unsigned long long GetTrackCount() { return sTrackCount.load(std::memory_order_relaxed); }
+
+    /// @brief Reset the track counter (called from RunAction::BeginOfRunAction).
+    static void ResetTrackCount() { sTrackCount.store(0, std::memory_order_relaxed); }
+
 private:
+    // Lock-free track counter (perf benchmarking: tracks/s).
+    static std::atomic<unsigned long long> sTrackCount;
+
     /// @brief Cached per-volume information (legacy, used by ObjectManager).
     struct VolumeCache {
         bool recordIon = false;

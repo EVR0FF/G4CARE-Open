@@ -1,0 +1,24 @@
+{
+  "name": "g4care-gui",
+  "version": "0.9.3",
+  "description": "G4CARE desktop GUI (Electron shell) — engine sidecar bridge, editor, cloud",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "NODE_OPTIONS=--max-old-space-size=4096 vite build && npm run build:viewer",
+    "build:viewer": "vite build --config vite.viewer.config.js",
+    "dev": "vite"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "vite": "^5.4.21"
+  },
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@kitware/vtk.js": "^37.4.6",
+    "jsroot": "^7.11.2",
+    "monaco-editor": "^0.57.0",
+    "monaco-yaml": "^5.5.1",
+    "plotly.js-dist-min": "^4.1.2"
+  }
+}

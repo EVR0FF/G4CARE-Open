@@ -1,8 +1,12 @@
 //==============================================================================
-// G4CARE cloud — configuration dependency scanner.
+// G4CARE - scan.ts — Cloud shared: scan
 //
-// Walks a YAML config to find every file it references, so `g4care-cloud pack`
-// can bundle a whole detector (config + INCLUDE blocks + GDML + macros + .so).
+// Cloud shared: scan
+//
+// @author I. I. Everstov  @author V. F. Myshkin (Scientific Supervisor)
+// @date 2026-11-11  @version 0.9.3
+// @copyright Copyright (c) 2026 G4CARE Developers
+// @license SPDX-License-Identifier: Apache-2.0
 //==============================================================================
 
 import { readFile } from 'node:fs/promises';

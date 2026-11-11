@@ -11,7 +11,6 @@ MACROS:
     stage: "before"
   - file: "movie_g4care.mac"
     stage: "after"
-ENABLE_DICTIONARY: false
 RUNACTION_VERBOSE: 1
 GEOMETRY:
   WORLD:

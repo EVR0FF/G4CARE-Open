@@ -64,8 +64,10 @@
 // #define exprtk_disable_rtl_io — REMOVED: enable print/println for user configs
 #include "exprtk.hpp"
 
-G4ThreadLocal std::unique_ptr<ExpressionEvaluator::ThreadLocalData> ExpressionEvaluator::fgTLS;
+std::unique_ptr<ExpressionEvaluator::ThreadLocalData> ExpressionEvaluator::fgTLS;
 std::map<std::string, int> ExpressionEvaluator::fDataAliases;
+std::map<std::string, double> ExpressionEvaluator::sGlobalConstants;
+std::map<std::string, std::unique_ptr<ExpressionEvaluator::GlobalFunction>> ExpressionEvaluator::sGlobalFunctions;
 G4ThreadLocal bool ExpressionEvaluator::fgAbortEventFlag = false;
 G4ThreadLocal bool ExpressionEvaluator::fgKillTrackFlag = false;
 THREAD_LOCAL std::unordered_map<std::string, std::shared_ptr<ExpressionEvaluator::CompiledExpression>> ExpressionEvaluator::fCache;
@@ -131,8 +133,8 @@ ExpressionEvaluator::PrecompiledExpr::PrecompiledExpr(const std::string& raw,
 ///
 /// @param expr_str       Raw expression string.
 /// @param var_names      Variable names to pre-register in the symbol table.
-/// @param extraFunctions Additional user functions (from ExprsManager).
-/// @param extraConstants Additional user constants (from ExprsManager).
+/// @param extraFunctions Additional user functions (from ScriptsManager).
+/// @param extraConstants Additional user constants (from ScriptsManager).
 /// @return               Shared pointer to CompiledExpression, or nullptr.
 ///
 /// The compiled expression is cached in fCache for reuse.  Function
@@ -154,7 +156,12 @@ ExpressionEvaluator::Precompile(const std::string& expr_str,
     return nullptr;
     }
 
-    auto it = fCache.find(trimmed);
+    std::string cacheKey = trimmed;
+    for (const auto& vn : var_names) cacheKey += "\nV:" + vn;
+    for (const auto& ec : extraConstants) cacheKey += "\nC:" + ec.first + "=" + std::to_string(ec.second);
+    for (const auto& ef : extraFunctions) cacheKey += "\nF:" + ef.first;
+    for (const auto& gc : sGlobalConstants) cacheKey += "\nG:" + gc.first + "=" + std::to_string(gc.second);
+    auto it = fCache.find(cacheKey);
     if (it != fCache.end()) return it->second;
 
     auto compiled = std::make_unique<CompiledExpression>();
@@ -216,6 +223,10 @@ ExpressionEvaluator::Precompile(const std::string& expr_str,
   
     compiled->symbol_table.add_function("data_rows", s_dataRows);
     compiled->symbol_table.add_function("data_cell", s_dataCell);
+    static thread_local Interp1DFunc s_interp1d;
+    static thread_local Interp2DFunc s_interp2d;
+    compiled->symbol_table.add_function("interp1d", s_interp1d);
+    compiled->symbol_table.add_function("interp2d", s_interp2d);
 
     compiled->symbol_table.add_function("g4cout", s_outputFunc);
     compiled->symbol_table.add_function("g4cerr", s_errorFunc);
@@ -229,6 +240,25 @@ ExpressionEvaluator::Precompile(const std::string& expr_str,
     static thread_local FormatFunc s_formatFunc;
     compiled->symbol_table.add_function("format", s_formatFunc);
 
+    // Gamma functions (not built into this ExprTK build).
+    struct TgammaFunc : public exprtk::ifunction<double> {
+        TgammaFunc() : exprtk::ifunction<double>(1) {}
+        double operator()(const double& x) override { return std::tgamma(x); }
+    };
+    struct LgammaFunc : public exprtk::ifunction<double> {
+        LgammaFunc() : exprtk::ifunction<double>(1) {}
+        double operator()(const double& x) override { return std::lgamma(x); }
+    };
+    static thread_local TgammaFunc s_tgamma;
+    static thread_local LgammaFunc s_lgamma;
+    compiled->symbol_table.add_function("tgamma", s_tgamma);
+    compiled->symbol_table.add_function("lgamma", s_lgamma);
+
+    // Global SCRIPT functions (unified namespace).
+    for (const auto& [fname, fptr] : sGlobalFunctions) {
+        compiled->symbol_table.add_function(fname, *fptr);
+    }
+
 
     // Extra functions from ExpressionManager (user inline functions)
     for (const auto& [fname, fptr] : extraFunctions) {
@@ -237,6 +267,9 @@ ExpressionEvaluator::Precompile(const std::string& expr_str,
 
     // Extra constants from ExpressionManager (user variables + выражений)
     for (const auto& [cname, cval] : extraConstants) {
+        compiled->symbol_table.add_constant(cname, cval);
+    }
+    for (const auto& [cname, cval] : sGlobalConstants) {
         compiled->symbol_table.add_constant(cname, cval);
     }
 
@@ -306,6 +339,13 @@ ExpressionEvaluator::Precompile(const std::string& expr_str,
     compiled->symbol_table.add_vector("Gt",     compiled->chemGt);
     compiled->symbol_table.add_vector("charge", compiled->chemCharge);
 
+    // String variables (MATLAB-like): volume/material/particle/process names.
+    compiled->stringVars["volume_name"] = "";
+    compiled->stringVars["material_name"] = "";
+    compiled->stringVars["particle_name"] = "";
+    compiled->stringVars["process_name"] = "";
+    for (auto& sv : compiled->stringVars) compiled->symbol_table.add_stringvar(sv.first, sv.second);
+
     // Register CLHEP units BEFORE symbol_table registration (ExprTK requires this order)
     // Skip single-char units only (n=nano, k=kilo, m=meter, s=second...)
     // to avoid variable name conflicts while keeping cm, mm, nm, ps, ns, etc.
@@ -318,6 +358,10 @@ ExpressionEvaluator::Precompile(const std::string& expr_str,
         }
     }
 
+
+    // Vector operations (rtl::vecops): sum, avg, dot, diff, sort, ...
+    static thread_local exprtk::rtl::vecops::package<double> s_vecops;
+    s_vecops.register_package(compiled->symbol_table);
     compiled->expr.register_symbol_table(compiled->symbol_table);
 
     parser.settings().enable_all_control_structures();
@@ -331,7 +375,7 @@ ExpressionEvaluator::Precompile(const std::string& expr_str,
     }
 
     auto shared = std::shared_ptr<CompiledExpression>(compiled.release());
-    fCache[trimmed] = shared;
+    fCache[cacheKey] = shared;
     return shared;
 }
 
@@ -419,6 +463,10 @@ ExpressionEvaluator::PrecompileForFilter(const std::string& expr_str,
 
     compiled->symbol_table.add_function("data_rows", s_dataRows);
     compiled->symbol_table.add_function("data_cell", s_dataCell);
+    static thread_local Interp1DFunc s_interp1d;
+    static thread_local Interp2DFunc s_interp2d;
+    compiled->symbol_table.add_function("interp1d", s_interp1d);
+    compiled->symbol_table.add_function("interp2d", s_interp2d);
 
     compiled->symbol_table.add_function("g4cout", s_outputFunc);
     compiled->symbol_table.add_function("g4cerr", s_errorFunc);
@@ -429,6 +477,11 @@ ExpressionEvaluator::PrecompileForFilter(const std::string& expr_str,
     static thread_local FormatFunc s_formatFunc2;
     compiled->symbol_table.add_function("format", s_formatFunc2);
 
+    // Global SCRIPT functions (unified namespace).
+    for (const auto& [fname, fptr] : sGlobalFunctions) {
+        compiled->symbol_table.add_function(fname, *fptr);
+    }
+
 
     // Extra functions from ExpressionManager (user inline functions)
     for (const auto& [fname, fptr] : extraFunctions) {
@@ -437,6 +490,9 @@ ExpressionEvaluator::PrecompileForFilter(const std::string& expr_str,
 
     // Extra constants from ExpressionManager (user variables — := constants)
     for (const auto& [cname, cval] : extraConstants) {
+        compiled->symbol_table.add_constant(cname, cval);
+    }
+    for (const auto& [cname, cval] : sGlobalConstants) {
         compiled->symbol_table.add_constant(cname, cval);
     }
 
@@ -571,6 +627,12 @@ double* ExpressionEvaluator::GetVariablePtr(CompiledExpression* compiled, const 
     if (!compiled) return nullptr;
     auto it = compiled->varPtrs.find(name);
     return (it != compiled->varPtrs.end()) ? it->second.get() : nullptr;
+}
+
+void ExpressionEvaluator::SetStringVar(CompiledExpression* compiled, const std::string& name, const std::string& value) {
+    if (!compiled) return;
+    auto it = compiled->stringVars.find(name);
+    if (it != compiled->stringVars.end()) it->second = value;
 }
 
 double ExpressionEvaluator::VertexAttrFunc::operator()(const double& idx) {
@@ -1029,6 +1091,98 @@ double ExpressionEvaluator::DataCellFunc::operator()(const double& idx, const do
     return val; 
 }
 
+// ── Table interpolation (interp1d / interp2d) ──
+
+double ExpressionEvaluator::Interp1DFunc::operator()(const double& idx, const double& x, const double& yCol) {
+    const int i = static_cast<int>(std::round(idx));
+    const int yc = static_cast<int>(std::round(yCol));
+    auto reader = ExpressionEvaluator::GetReader(i);
+    if (!reader) { G4cerr << "interp1d: reader not found for idx=" << i << G4endl; return 0.0; }
+    const size_t n = reader->GetNumberOfRows();
+    if (n == 0) return 0.0;
+    auto at = [&](size_t r, size_t c) { auto v = reader->GetCell(r, c); return v ? *v : 0.0; };
+    if (n == 1) return at(0, static_cast<size_t>(yc));
+    const double x0 = at(0, 0), y0 = at(0, static_cast<size_t>(yc));
+    const double xn = at(n - 1, 0), yn = at(n - 1, static_cast<size_t>(yc));
+    if (x <= x0) return y0;
+    if (x >= xn) return yn;
+    for (size_t r = 0; r + 1 < n; ++r) {
+        const double xa = at(r, 0), xb = at(r + 1, 0);
+        if (x >= xa && x <= xb) {
+            const double ya = at(r, static_cast<size_t>(yc));
+            const double yb = at(r + 1, static_cast<size_t>(yc));
+            if (xb == xa) return ya;
+            const double t = (x - xa) / (xb - xa);
+            return ya + (yb - ya) * t;
+        }
+    }
+    return yn;
+}
+
+double ExpressionEvaluator::Interp2DFunc::operator()(const double& idx, const double& x, const double& y, const double& zCol) {
+    const int i = static_cast<int>(std::round(idx));
+    const int zc = static_cast<int>(std::round(zCol));
+    auto reader = ExpressionEvaluator::GetReader(i);
+    if (!reader) { G4cerr << "interp2d: reader not found for idx=" << i << G4endl; return 0.0; }
+    const size_t n = reader->GetNumberOfRows();
+    if (n == 0) return 0.0;
+    auto at = [&](size_t r, size_t c) { auto v = reader->GetCell(r, c); return v ? *v : 0.0; };
+
+    // Regular grid sorted x-major: col0 = x (slow), col1 = y (fast), col zc = z.
+    // Determine ny (number of y steps) by finding where y repeats y[0].
+    size_t ny = 1;
+    const double y0 = at(0, 1);
+    for (size_t r = 1; r < n; ++r) {
+        if (std::abs(at(r, 1) - y0) < 1e-12) break;
+        ++ny;
+    }
+    if (ny == 0 || n % ny != 0) {
+        G4cerr << "interp2d: table is not a regular x-major grid (n=" << n << " ny=" << ny << ")" << G4endl;
+        return 0.0;
+    }
+    const size_t nx = n / ny;
+
+    // Locate x index (grid of nx values at rows k*ny).
+    size_t ix = 0;
+    if (nx <= 1) { ix = 0; }
+    else if (x <= at(0, 0)) { ix = 0; }
+    else if (x >= at((nx - 1) * ny, 0)) { ix = nx - 2; }
+    else {
+        size_t lo = 0, hi = nx - 1;
+        while (lo + 1 < hi) {
+            size_t mid = (lo + hi) / 2;
+            if (at(mid * ny, 0) <= x) lo = mid; else hi = mid;
+        }
+        ix = lo;
+    }
+
+    // Locate y index (grid of ny values at rows 0..ny-1).
+    size_t iy = 0;
+    if (ny <= 1) { iy = 0; }
+    else if (y <= at(0, 1)) { iy = 0; }
+    else if (y >= at(ny - 1, 1)) { iy = ny - 2; }
+    else {
+        size_t lo = 0, hi = ny - 1;
+        while (lo + 1 < hi) {
+            size_t mid = (lo + hi) / 2;
+            if (at(mid, 1) <= y) lo = mid; else hi = mid;
+        }
+        iy = lo;
+    }
+
+    const double xa = at(ix * ny, 0), xb = at((ix + 1) * ny, 0);
+    const double ya = at(iy, 1), yb = at(iy + 1, 1);
+    const double z00 = at(ix * ny + iy, static_cast<size_t>(zc));
+    const double z01 = at(ix * ny + iy + 1, static_cast<size_t>(zc));
+    const double z10 = at((ix + 1) * ny + iy, static_cast<size_t>(zc));
+    const double z11 = at((ix + 1) * ny + iy + 1, static_cast<size_t>(zc));
+    const double tx = (xb == xa) ? 0.0 : (x - xa) / (xb - xa);
+    const double ty = (yb == ya) ? 0.0 : (y - ya) / (yb - ya);
+    const double z0 = z00 + (z01 - z00) * ty;
+    const double z1 = z10 + (z11 - z10) * ty;
+    return z0 + (z1 - z0) * tx;
+}
+
 // ── Output / Error / Control functions ──
 
 double ExpressionEvaluator::OutputFunc::operator()(const std::size_t& /*ps_index*/,
@@ -1036,10 +1190,11 @@ double ExpressionEvaluator::OutputFunc::operator()(const std::size_t& /*ps_index
     typedef exprtk::igeneric_function<double>::generic_type GT;
     auto oldFlags = std::cout.flags();
     auto oldPrec  = std::cout.precision();
-    if (s_outFmt.scientific)
-        std::cout << std::scientific;
-    else
-        std::cout << std::fixed;
+    switch (s_outFmt.mode) {
+        case OutputFormat::Mode::Scientific: std::cout << std::scientific; break;
+        case OutputFormat::Mode::Fixed:      std::cout << std::fixed;      break;
+        default:                             std::cout << std::defaultfloat; break;
+    }
     std::cout.precision(s_outFmt.precision);
 
     for (std::size_t i = 0; i < parameters.size(); ++i) {
@@ -1061,10 +1216,11 @@ double ExpressionEvaluator::ErrorFunc::operator()(const std::size_t& /*ps_index*
     typedef exprtk::igeneric_function<double>::generic_type GT;
     auto oldFlags = std::cerr.flags();
     auto oldPrec  = std::cerr.precision();
-    if (s_outFmt.scientific)
-        std::cerr << std::scientific;
-    else
-        std::cerr << std::fixed;
+    switch (s_outFmt.mode) {
+        case OutputFormat::Mode::Scientific: std::cerr << std::scientific; break;
+        case OutputFormat::Mode::Fixed:      std::cerr << std::fixed;      break;
+        default:                             std::cerr << std::defaultfloat; break;
+    }
     std::cerr.precision(s_outFmt.precision);
 
     for (std::size_t i = 0; i < parameters.size(); ++i) {
@@ -1171,30 +1327,60 @@ void ExpressionEvaluator::ClearAll() {
     fgTLS.reset();
     fDataAliases.clear();
     fCache.clear();
+    sGlobalFunctions.clear();
 }
 
 // ── Format / Print / Println — replacement for rtl::io::package ──
 
 double ExpressionEvaluator::FormatFunc::operator()(
-    const std::size_t& ps_index,
+    const std::size_t& /*ps_index*/,
     exprtk::igeneric_function<double>::parameter_list_t parameters)
 {
-    if (ps_index == 0) {
+    typedef exprtk::igeneric_function<double>::generic_type GT;
+    if (parameters.empty()) return 0.0;
+    if (parameters[0].type == GT::e_string) {
+        // format('short'|'long'|'fixed'|'sci'|'general')
+        std::string s(static_cast<const char*>(parameters[0].data), parameters[0].size);
+        if (s == "short" || s == "default") {
+            s_outFmt.precision = 6; s_outFmt.mode = OutputFormat::Mode::General;
+        } else if (s == "long") {
+            s_outFmt.precision = 15; s_outFmt.mode = OutputFormat::Mode::General;
+        } else if (s == "fixed") {
+            s_outFmt.mode = OutputFormat::Mode::Fixed;
+        } else if (s == "sci" || s == "scientific") {
+            s_outFmt.mode = OutputFormat::Mode::Scientific;
+        } else if (s == "general" || s == "g" || s == "shortg" || s == "shortG") {
+            s_outFmt.mode = OutputFormat::Mode::General;
+        }
+    } else {
         // format(N) — set precision
         double n = *static_cast<double*>(parameters[0].data);
         s_outFmt.precision = std::max(1, std::min(17, static_cast<int>(std::round(n))));
-    } else {
-        // format('short'|'long'|'fixed'|'sci')
-        std::string& s = *static_cast<std::string*>(parameters[0].data);
-        if (s == "short" || s == "default") {
-            s_outFmt.precision = 6; s_outFmt.scientific = true;
-        } else if (s == "long") {
-            s_outFmt.precision = 15; s_outFmt.scientific = true;
-        } else if (s == "fixed") {
-            s_outFmt.scientific = false;
-        } else if (s == "sci" || s == "scientific") {
-            s_outFmt.scientific = true;
-        }
     }
     return 0.0;
+}
+
+/// @brief Compile and register a SCRIPT function into the global namespace.
+void ExpressionEvaluator::RegisterGlobalFunction(const std::string& name,
+                                                 const std::vector<std::string>& args,
+                                                 const std::string& body) {
+    if (name.empty() || body.empty()) return;
+    ExpressionEvaluator eval;
+    auto compiled = eval.Precompile(body, args);
+    if (!compiled) {
+        G4cerr << "ExpressionEvaluator: failed to compile global function '" << name << "'" << G4endl;
+        return;
+    }
+    auto fn = std::make_unique<GlobalFunction>();
+    fn->compiled = compiled;
+    fn->argNames = args;
+    sGlobalFunctions[name] = std::move(fn);
+    G4cout << "ExpressionEvaluator: registered global function '" << name << "'(";
+    for (std::size_t i = 0; i < args.size(); ++i) { if (i) G4cout << ","; G4cout << args[i]; }
+    G4cout << ")" << G4endl;
+}
+
+/// @brief Clear all registered SCRIPT functions.
+void ExpressionEvaluator::ClearGlobalFunctions() {
+    sGlobalFunctions.clear();
 }

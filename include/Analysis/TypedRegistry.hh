@@ -2,10 +2,10 @@
 // G4CARE
 // @file    TypedRegistry.hh
 // @brief   Template registry that maps values of type T to sequential integer
-//          IDs and can create/populate a G4Analysis dictionary ntuple.
-// @details Thread-safe: registration is performed only in the master thread
-//   before worker threads launch; GetID is a read-only lock-free lookup.
-//   Supports string, G4String, int, and double types for dictionary columns.
+//          IDs for fast, lock-free lookup.
+// @details Thread-safe: registration is performed before worker threads
+//   launch; GetID is a read-only lock-free lookup.
+//   Supports string, G4String, int, and double types.
 //
 //   Configuration keys read: none (utility template).
 // @author  I. I. Everstov
@@ -19,13 +19,11 @@
 #define TYPED_REGISTRY_HH
 
 #include "G4String.hh"
-#include "G4AnalysisManager.hh"
 #include <map>
 #include <vector>
 #include <string>
-#include <type_traits>
 
-/// @brief Thread-safe bidirectional value↔ID registry with dictionary output.
+/// @brief Thread-safe bidirectional value↔ID registry.
 template<typename T>
 class TypedRegistry {
 public:
@@ -64,47 +62,6 @@ public:
     void Clear() {
         fMap.clear();
         fValues.clear();
-    }
-
-    /// Phase 1: create the ntuple structure (before OpenFile).
-    /// Called in CreateDictionaryTrees (master and workers before file open).
-    /// Returns the created ntuple ID, or -1 if no data exists.
-    int CreateDictionary(G4AnalysisManager* man, const std::string& ntupleName) const {
-        if (fValues.empty()) return -1;
-
-        int ntupleId = man->CreateNtuple(ntupleName, ntupleName + " Dictionary");
-        int idCol = man->CreateNtupleIColumn(ntupleId, "id");
-        if constexpr (std::is_same_v<T, std::string>) {
-            man->CreateNtupleSColumn(ntupleId, "value");
-        } else if constexpr (std::is_same_v<T, G4String>) {
-            man->CreateNtupleSColumn(ntupleId, "value");
-        } else if constexpr (std::is_same_v<T, int>) {
-            man->CreateNtupleIColumn(ntupleId, "value");
-        } else if constexpr (std::is_same_v<T, double>) {
-            man->CreateNtupleDColumn(ntupleId, "value");
-        } else {
-            static_assert(sizeof(T) == 0, "Unsupported type for dictionary");
-        }
-        man->FinishNtuple(ntupleId);
-        return ntupleId;
-    }
-
-    /// Phase 2: fill the ntuple with data (after OpenFile).
-    /// Called in FillDictionaryTrees (master and each worker).
-    void FillDictionary(G4AnalysisManager* man, int ntupleId) const {
-        if (ntupleId < 0 || fValues.empty()) return;
-
-        for (size_t i = 0; i < fValues.size(); ++i) {
-            man->FillNtupleIColumn(ntupleId, 0, static_cast<int>(i));
-            if constexpr (std::is_same_v<T, std::string> || std::is_same_v<T, G4String>) {
-                man->FillNtupleSColumn(ntupleId, 1, fValues[i]);
-            } else if constexpr (std::is_same_v<T, int>) {
-                man->FillNtupleIColumn(ntupleId, 1, fValues[i]);
-            } else if constexpr (std::is_same_v<T, double>) {
-                man->FillNtupleDColumn(ntupleId, 1, fValues[i]);
-            }
-            man->AddNtupleRow(ntupleId);
-        }
     }
 
 private:

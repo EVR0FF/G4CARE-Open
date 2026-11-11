@@ -57,6 +57,9 @@ public:
     /// @param id Detector identifier
     void SetDetectorID(G4int id) { fDetectorID = id; }
 
+    /// @brief Set whether this SD feeds the RTDOSE voxel scorer (phantom voxels).
+    void SetDoseScoring(bool on) { fDoseScoring = on; }
+
     /// @brief Get the detector ID
     /// @return Detector identifier
     G4int GetDetectorID() const { return fDetectorID; }
@@ -70,6 +73,9 @@ private:
 
     /// @brief Detector ID for linking to DetectorRegistry
     G4int fDetectorID;
+
+    /// @brief When true, ProcessHits also feeds the RTDOSE voxel dose scorer
+    bool fDoseScoring = false;
 };
 
 #endif

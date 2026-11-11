@@ -75,9 +75,9 @@ bool DICOMResampler::ResampleToAxisAligned(const CTSeries& in, CTSeries& out) {
     const double row[3] = {in.direction[0], in.direction[1], in.direction[2]};
     const double col[3] = {in.direction[3], in.direction[4], in.direction[5]};
     const double nrm[3] = {
-        row[1] * col[2] - row[2] * col[1],
-        row[2] * col[0] - row[0] * col[2],
-        row[0] * col[1] - row[1] * col[0]
+        col[1] * row[2] - col[2] * row[1],
+        col[2] * row[0] - col[0] * row[2],
+        col[0] * row[1] - col[1] * row[0]
     };
 
     // Lattice basis: voxel (ix,iy,iz) centre = origin + ix*e0 + iy*e1 + iz*e2.

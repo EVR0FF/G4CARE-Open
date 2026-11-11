@@ -1,0 +1,11 @@
+# HU -> material calibration table (GATE-style).
+# Each non-comment line:  minHU  maxHU  MaterialName  [density_g_per_cm3]
+# '#' starts a comment; blank lines are ignored.
+# Density, when omitted, is the material's NIST density; when given, a new
+# material with that density is built from the same element composition.
+-1000   -900   G4_AIR
+-899    -400   G4_LUNG_ICRP
+-399    -100   G4_TISSUE_SOFT_ICRP
+-99     -50    G4_ADIPOSE_TISSUE_ICRP
+-49     300    G4_MUSCLE_SKELETAL_ICRP
+301     3071   G4_BONE_CORTICAL_ICRP

@@ -36,7 +36,6 @@
 #include "G4PhysicalVolumeStore.hh"
 #include "G4LogicalVolumeStore.hh"
 #include "G4SolidStore.hh"
-#include "G4AnalysisManager.hh"
 #include "BeamAnalysis.hh"
 #include "RunAction.hh"
 #include "GeometryManager.hh"
@@ -101,19 +100,8 @@ void StageManager::LoadConfiguration(const std::string& configFileName) {
                  sc.saveChemState, sc.loadChemState);
     }
 
-    std::vector<std::string> tracked = cfg->GetStringVector("ANALYSIS.TRACKED_PROPERTIES");
-    fPropertyTracker.Initialize(tracked);
 }
 
-/// @brief Sets up property history tracking NTuple columns.
-/// @param histNtupleId  History NTuple ID.
-/// @param colRunId      Column index for run ID.
-/// @param colPropName   Column index for property name.
-/// @param colValue      Column index for property value.
-void StageManager::InitializePropertyTracker(int histNtupleId, int colRunId,
-                                              int colPropName, int colValue) {
-    fPropertyTracker.SetHistoryNtupleId(histNtupleId, colRunId, colPropName, colValue);
-}
 
 /// @brief Runs all stages sequentially. Falls back to root-level config if no STAGES defined.
 void StageManager::RunAll() {
@@ -162,12 +150,6 @@ void StageManager::RunAll() {
             G4cout << "StageManager: Chemistry state saved." << G4endl;
         }
 
-        std::map<std::string, std::string> currentValues;
-        fPropertyTracker.Update(static_cast<int>(i), currentValues);
-        for (const auto& key : fPropertyTracker.GetTrackedProperties()) {
-            currentValues[key] = GetCurrentPropertyValue(key);
-        }
-        fPropertyTracker.Update(static_cast<int>(i), currentValues);
     }
 }
 

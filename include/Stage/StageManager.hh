@@ -7,7 +7,7 @@
 // @details StageManager supports configuring a sequence of simulation stages,
 //   each with its own detector geometry, number of events, optional physics
 //   and chemistry macro paths, and chemistry state save/load flags.  It also
-//   integrates with PropertyTracker to log property changes between stages.
+//   runs user-defined stages sequentially.
 //
 //   Configuration keys read: STAGES.*.
 // @author  I. I. Everstov
@@ -23,7 +23,6 @@
 #include "G4RunManager.hh"
 #include "G4VUserDetectorConstruction.hh"
 #include "ConfigManager.hh"
-#include "PropertyTracker.hh"
 #include <vector>
 #include <string>
 
@@ -57,9 +56,6 @@ public:
     /// @brief Sets the RunAction to be used for all stages.
     void SetRunAction(RunAction* ra) { fRunAction = ra; }
 
-    /// @brief Initializes the PropertyTracker with ntuple column IDs.
-    void InitializePropertyTracker(int histNtupleId, int colRunId,
-                                    int colPropName, int colValue);
 
     /// @brief Executes all configured stages sequentially.
     void RunAll();
@@ -67,7 +63,6 @@ public:
 private:
     G4RunManager* fRunManager;
     RunAction* fRunAction = nullptr;
-    PropertyTracker fPropertyTracker;
 
     /// @brief Describes a single simulation stage.
     struct Stage {

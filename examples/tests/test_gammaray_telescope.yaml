@@ -6,30 +6,47 @@
 #   DetectorX:  -tkrSizeZ/2 + tSi + dViews + tSi/2
 # Пороги из GammaRayTelDigitizer: TKR=120keV, CAL=0, ACD=15keV
 
-EVENTS: 10
+EVENTS: 300
 VISUALIZATION: false
-OUTPUT_FILE: "test_gammaray_telescope.root"
-ENABLE_DICTIONARY: false
+OUTPUT:
+  file: "test_gammaray_telescope.root"
+  streams:
+    - name: "digits_cal"
+      level: "digit"
+      filter: { volumes: ["CAL"] }
+      columns: [detector_name, digit_energy_MeV, digit_type]
+    - name: "digits_tkr"
+      level: "digit"
+      filter: { volumes: ["TKRDetector"] }
+      columns: [detector_name, digit_energy_MeV, digit_type]
+    - name: "digits_acd"
+      level: "digit"
+      filter: { volumes: ["ACD"] }
+      columns: [detector_name, digit_energy_MeV, digit_type]
+    - name: "hits_tkr"
+      level: "hit"
+      filter: { volumes: ["TKRDetector"] }
+      columns: [hit_edep_MeV, strip_number, plane_number, is_x_plane, pos_x, pos_y, pos_z]
 
 GEOMETRY:
   WORLD:
     shape: "box"
     material: "G4_Galactic"
-    DIMENSIONS: ["2*m", "2*m", "2*m"]
+    DIMENSIONS: ["72*cm", "72*cm", "112*cm"]
   OBJECTS:
     payload:
       name: "Payload"
       shape: "box"
       material: "G4_Galactic"
-      DIMENSIONS: ["90*cm", "90*cm", "200*cm"]
+      DIMENSIONS: ["48*cm", "48*cm", "74*cm"]
       POSITION: [0, 0, 0]
 
     calorimeter:
       name: "CAL"
       shape: "box"
       material: "G4_CESIUM_IODIDE"
-      DIMENSIONS: ["90*cm", "90*cm", "40*cm"]
-      POSITION: [0, 0, "-80*cm"]
+      DIMENSIONS: ["36*cm", "36*cm", "15*cm"]
+      POSITION: [0, 0, "-29.6*cm"]
       mother: "Payload"
       isSensitive: true
       DIGITIZE:
@@ -42,27 +59,27 @@ GEOMETRY:
       name: "TKR"
       shape: "box"
       material: "G4_Galactic"
-      DIMENSIONS: ["90*cm", "90*cm", "4.8*cm"]
-      POSITION: [0, 0, "-40*cm"]
+      DIMENSIONS: ["36*cm", "36*cm", "3*cm"]
+      POSITION: [0, 0, "1.9*cm"]
       mother: "Payload"
       REPLICA:
         axis: "z"
         count: 15
-        step: "0.3186*cm"
+        step: "3*cm"
         offset: 0
       CHILDREN:
         converter:
           name: "Converter"
           shape: "box"
           material: "G4_W"
-          DIMENSIONS: ["90*cm", "90*cm", "0.03*cm"]
-          POSITION: [0, 0, "-2*cm"]
+          DIMENSIONS: ["36*cm", "36*cm", "0.03*cm"]
+          POSITION: [0, 0, "-1.305*cm"]
         det_y:
           name: "TKRDetectorY"
           shape: "box"
           material: "G4_Si"
-          DIMENSIONS: ["90*cm", "90*cm", "0.04*cm"]
-          POSITION: [0, 0, "0*cm"]
+          DIMENSIONS: ["36*cm", "36*cm", "0.04*cm"]
+          POSITION: [0, 0, "-1.48*cm"]
           isSensitive: true
           DIGITIZE:
             threshold: "120*keV"
@@ -72,8 +89,8 @@ GEOMETRY:
           name: "TKRDetectorX"
           shape: "box"
           material: "G4_Si"
-          DIMENSIONS: ["90*cm", "90*cm", "0.04*cm"]
-          POSITION: [0, 0, "0.08*cm"]
+          DIMENSIONS: ["36*cm", "36*cm", "0.04*cm"]
+          POSITION: [0, 0, "-1.34*cm"]
           isSensitive: true
           DIGITIZE:
             threshold: "120*keV"
@@ -84,8 +101,8 @@ GEOMETRY:
       name: "ACD"
       shape: "box"
       material: "G4_PLASTIC_SC_VINYLTOLUENE"
-      DIMENSIONS: ["90*cm", "90*cm", "2*cm"]
-      POSITION: [0, 0, "30*cm"]
+      DIMENSIONS: ["48*cm", "48*cm", "1*cm"]
+      POSITION: [0, 0, "29.9*cm"]
       mother: "Payload"
       isSensitive: true
       DIGITIZE:
@@ -93,22 +110,34 @@ GEOMETRY:
         digit_type: 2
         quantum_efficiency: 1.0
 
+SOURCE_MODE: event
+
 SOURCE:
+  proton_source:
+    type: "particleGun"
+    particle: "proton"
+    energy: "rand_uniform(1,10)*GeV"
+    direction: { x: 0, y: 0, z: -1 }
+    hemisphere: true
+    vertex_radius: "25*cm"
+    weight: 1
   gamma_source:
     type: "particleGun"
     particle: "gamma"
-    energy: "1*GeV"
-    direction: { x: 0, y: 0, z: 1 }
-    pos: { x: 0, y: 0, z: "-80*cm" }
+    energy: "rand_uniform(1,10)*GeV"
+    direction: { x: 0, y: 0, z: -1 }
+    hemisphere: true
+    vertex_radius: "25*cm"
+    weight: 1
+  electron_source:
+    type: "particleGun"
+    particle: "e-"
+    energy: "rand_uniform(1,10)*GeV"
+    direction: { x: 0, y: 0, z: -1 }
+    hemisphere: true
+    vertex_radius: "25*cm"
+    weight: 1
 
-NTUPLES: ["g4care", "digits"]
-
-NTUPLE:
-  digits:
-    columns:
-      - energy
-      - detector_id
-      - digit_type
 
 PHYSICS:
   BASIC:

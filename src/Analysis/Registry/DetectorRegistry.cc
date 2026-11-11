@@ -4,8 +4,7 @@
 // @brief   Registry that maps G4VSensitiveDetector pointers and detector names
 //          to unique integer IDs and stores per-detector properties.
 // @details DetectorRegistry maintains a vector of (SD*, DetectorProperties)
-//   pairs and a name-to-ID lookup.  It is used by DigitizerModule and
-//   DictionaryWriter to produce the detector_dict ntuple.
+//   pairs and a name-to-ID lookup.  It is used by DigitizerModule.
 //
 //   Configuration keys read: none (registry data structure).
 // @author  I. I. Everstov
@@ -30,6 +29,7 @@ int DetectorRegistry::RegisterDetector(G4VSensitiveDetector* sd, const std::stri
     fNameToID[name] = id;
     fDetectorToID[sd] = id;
     fDetectors.emplace_back(sd, props);
+    fIDToName[id] = name;
     return id;
 }
 
@@ -68,5 +68,14 @@ const DetectorProperties& DetectorRegistry::GetProperties(int id) const {
 void DetectorRegistry::Clear() {
     fDetectorToID.clear();
     fNameToID.clear();
+    fIDToName.clear();
     fDetectors.clear();
+}
+
+/// @brief Returns the detector name for a given detector ID.
+/// @param id Detector ID.
+/// @return Detector name, or empty string if ID is invalid.
+std::string DetectorRegistry::GetName(int id) const {
+    auto it = fIDToName.find(id);
+    return (it != fIDToName.end()) ? it->second : "";
 }

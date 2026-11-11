@@ -1,0 +1,476 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>G4CARE</title>
+  <!-- Theme & base styles live in gui/src/styles/theme.css (imported by renderer.js). -->
+</head>
+<body>
+  <div id="tabs">
+    <button class="tab active" data-tab="input"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-file-text"></use></svg><span data-i18n="tab.input">Конфигурация</span></button>
+    <button class="tab" data-tab="geometry"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-box"></use></svg><span data-i18n="tab.geometry">Геометрия</span></button>
+    <button class="tab" data-tab="dicom"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-scan-line"></use></svg><span data-i18n="tab.dicom">Цифровая диагностика</span></button>
+  </div>
+  <div id="main">
+    <div id="sidebar">
+      <div style="display:flex; flex-direction:column; border-bottom:1px solid var(--border); flex:none;">
+        <button id="side-tab-project" class="side-tab active" data-i18n="side.project">Проект</button>
+        <button id="side-tab-results" class="side-tab" data-i18n="side.results">Результаты</button>
+      </div>
+      <div id="side-pane-project" style="display:flex; flex-direction:column; flex:1; min-height:0;">
+        <div class="side-title" data-i18n="side.explorer">Проводник</div>
+        <div style="display:flex; gap:4px; padding:0 8px 6px;">
+          <button id="side-choose-dir" style="flex:1;" data-i18n="side.chooseDir">Выбрать папку…</button>
+        </div>
+        <div id="side-dir-path" style="padding:0 8px 6px; color:var(--text-2); font:11px monospace; word-break:break-all;">Папка не выбрана</div>
+        <div id="side-explorer" style="padding:0 6px 6px; overflow-y:auto; min-height:0; flex:1;"></div>
+      </div>
+      <div id="side-pane-results" style="display:none; flex-direction:column; flex:1; min-height:0;">
+        <button id="side-root" class="side-action"><svg class="g4c-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-database"></use></svg>ROOT</button>
+        <button id="side-paraview" class="side-action"><svg class="g4c-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-box"></use></svg>ParaView</button>
+        <button id="side-cloud" class="side-action"><svg class="g4c-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-upload"></use></svg>Cloud</button>
+      </div>
+      <div style="display:none;">
+        <div class="side-item" id="side-config">config.yaml</div>
+        <div id="object-tree"></div>
+        <div id="prop-panel"></div>
+      </div>
+    </div>
+    <div id="content">
+      <div id="tab-input" class="pane active">
+        <div id="toolbar">
+          <strong>G4CARE</strong>
+          <span id="status">idle</span>
+          <span id="geom-status" style="color:var(--text-3)">3D: …</span>
+          <span class="tb-sep"></span>
+          <button id="btn-run" class="primary"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-play"></use></svg><span data-i18n="toolbar.run">Запуск</span></button>
+          <button id="btn-stop"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-square"></use></svg><span data-i18n="toolbar.stop">Стоп</span></button>
+          <button id="btn-restart"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-rotate-ccw"></use></svg><span data-i18n="toolbar.restart">Перезапуск</span></button>
+          <span class="tb-sep"></span>
+          <div style="position:relative;">
+            <button id="btn-export-menu"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-download"></use></svg><span data-i18n="toolbar.export">Экспорт</span> ▾</button>
+            <div id="export-menu" style="display:none; position:absolute; top:calc(100% + 3px); left:0; z-index:300; background:var(--panel); border:1px solid var(--border); border-radius:4px; padding:4px; min-width:200px; box-shadow:0 4px 12px rgba(0,0,0,0.4);">
+              <button id="btn-export-scene" style="display:flex; align-items:center; gap:6px; width:100%; text-align:left; background:none; border:none; color:var(--text-2); padding:6px 10px; cursor:pointer; font:12px var(--sans); border-radius:3px;"><svg class="g4c-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-download"></use></svg><span data-i18n="toolbar.exportScene">Экспорт сцены</span></button>
+              <button id="btn-export-gdml" style="display:flex; align-items:center; gap:6px; width:100%; text-align:left; background:none; border:none; color:var(--text-2); padding:6px 10px; cursor:pointer; font:12px var(--sans); border-radius:3px;"><svg class="g4c-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-file-code-2"></use></svg><span data-i18n="toolbar.exportGdml">Экспорт GDML</span></button>
+            </div>
+          </div>
+          <span class="tb-sep"></span>
+          <button id="btn-script-toggle"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-file-code-2"></use></svg><span data-i18n="toolbar.script">Скрипт</span></button>
+        </div>
+        <div style="display:flex; flex-direction:column; flex:1; min-height:0;">
+          <div id="editor-tabs" style="display:flex; align-items:stretch; background:var(--bg-bar); border-bottom:1px solid var(--border); flex-shrink:0; overflow-x:auto; padding:2px 4px 0 4px; gap:2px;"></div>
+          <div style="display:flex; flex:1; min-height:0;">
+            <div id="editor" style="flex:1; min-width:0;"></div>
+            <div id="script-pane" style="width:46%; min-width:340px; border-left:1px solid var(--border); display:none; flex-direction:column;">
+            <div style="display:flex; align-items:center; gap:8px; padding:6px 10px; border-bottom:1px solid var(--border); background:var(--bg-bar); flex-shrink:0;">
+              <span style="font-weight:bold; font:13px var(--sans);" data-i18n="scr.title">Скрипт (SCRIPT)</span>
+              <button id="script-add" style="background:var(--panel); color:var(--text-2); border:1px solid var(--border); cursor:pointer; padding:2px 8px;" data-i18n="scr.addScript">+ скрипт</button>
+              <button id="script-check" style="background:var(--panel); color:var(--text-2); border:1px solid var(--border); cursor:pointer; padding:3px 10px;" data-i18n="scr.check">Проверить</button>
+              <span id="script-status" style="color:var(--text-3); font:11px sans-serif; margin-left:auto;"></span>
+              <button id="script-save" style="background:var(--panel); color:var(--text-2); border:1px solid var(--border); cursor:pointer; padding:3px 10px;" data-i18n="ctx.save">Сохранить</button>
+            </div>
+            <div id="script-tabs" style="display:flex; flex-wrap:wrap; gap:4px; padding:4px 8px; border-bottom:1px solid var(--border); flex-shrink:0;"></div>
+            <div id="script-props-head" style="display:flex; align-items:center; gap:6px; padding:4px 8px; border-bottom:1px solid var(--border); cursor:pointer; flex-shrink:0; color:var(--text-2); font:12px sans-serif;"><span id="script-props-caret">▾</span><span data-i18n="scr.properties">Свойства</span></div>
+            <div id="script-meta" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:4px 8px; border-bottom:1px solid var(--border); flex-shrink:0;"></div>
+            <div style="display:flex; flex:1; min-height:0;">
+              <div id="script-editor" style="flex:1; min-width:0;"></div>
+              <div id="script-sidebar" style="width:210px; min-width:150px; border-left:1px solid var(--border); overflow-y:auto; padding:6px; background:var(--panel-2); flex:none;"></div>
+            </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="tab-geometry" class="pane">
+        <div id="geom-toolbar" style="display:flex; align-items:center; gap:8px; padding:6px 10px; border-bottom:1px solid var(--border); background:var(--bg-bar); flex-shrink:0;">
+          <span style="color:var(--text-2); font:12px sans-serif;" data-i18n="geom.export">Экспорт:</span>
+          <button id="geom-export-rtplan"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-download"></use></svg><span data-i18n="geom.exportRtplan">Экспорт RTPLAN</span></button>
+          <button id="geom-export-rtdose"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-download"></use></svg><span data-i18n="geom.exportRtdose">Экспорт RTDOSE</span></button>
+          <span id="geom-export-info" style="color:var(--ok); font:12px monospace;"></span>
+        </div>
+        <div id="viewer-pane"><iframe id="viewer-frame" title="3D viewer"></iframe></div>
+      </div>
+      <div id="tab-dicom" class="pane">
+        <!-- Tabbed toolbar (Weasis-style grouped tools) -->
+        <div style="border-bottom:1px solid var(--border); background:var(--bg-bar); flex-shrink:0;">
+          <div style="display:flex; align-items:center; gap:2px; padding:6px 10px 0 0; flex-wrap:nowrap; overflow-x:auto;">
+            <button class="dcm-tgroup active" data-group="data"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-folder-open"></use></svg><span data-i18n="dicom.group.data">Данные</span></button>
+            <button class="dcm-tgroup" data-group="view"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-eye"></use></svg><span data-i18n="dicom.group.view">Вид</span></button>
+            <button class="dcm-tgroup" data-group="tools"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-pencil"></use></svg><span data-i18n="dicom.group.tools">Инструменты</span></button>
+            <button class="dcm-tgroup" data-group="analysis"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chart-column"></use></svg><span data-i18n="dicom.group.analysis">Анализ</span></button>
+            <span id="dcm-info" style="color:var(--text-3); font:12px monospace; margin-left:auto; padding-bottom:4px;">CT не загружена</span>
+          </div>
+          <div style="padding:6px 10px 6px 0; min-height:32px; overflow-x:auto;">
+            <div id="dcm-group-data" class="dcm-tgroup-pane active">
+              <button id="dcm-load"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-image"></use></svg><span data-i18n="dicom.load">Загрузить CT</span></button>
+              <button id="dcm-load-nrrd"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-file-text"></use></svg><span data-i18n="dicom.loadNrrd">Загрузить NRRD/NIfTI</span></button>
+              <button id="dcm-rtstruct-load"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-activity"></use></svg><span data-i18n="dicom.loadRtstruct">Загрузить RTSTRUCT</span></button>
+              <button id="dcm-rtdose-load"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chart-column"></use></svg><span data-i18n="dicom.loadRtdose">Загрузить RTDOSE</span></button>
+              <button id="dcm-rtplan-load"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-target"></use></svg><span data-i18n="dicom.loadRtplan">Загрузить RTPLAN</span></button>
+              <button id="dcm-rtplan-import"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-upload"></use></svg><span data-i18n="dicom.importBeams">Импорт пучков в источник</span></button>
+              <button id="dcm-rtstruct-save"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-download"></use></svg><span data-i18n="dicom.exportRtstruct">Экспорт RTSTRUCT</span></button>
+              <button id="dcm-reset" style="color:#ff8f8f;"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-rotate-ccw"></use></svg><span data-i18n="dicom.reset">Сбросить</span></button>
+            </div>
+            <div id="dcm-group-view" class="dcm-tgroup-pane">
+              <span class="dcm-caption" data-i18n="dicom.captionImage">Изображение</span>
+              <label style="color:var(--text-2); font:12px sans-serif;"><span data-i18n="dicom.wlLabel">Окно/уровень:</span>
+                <select id="dcm-wl" style="background:var(--inset); color:var(--text); border:1px solid var(--border); padding:3px 6px;">
+                  <option value="" data-i18n="dicom.wl.custom">Пользовательский</option>
+                  <option value="400,40" data-i18n="dicom.wl.soft">Мягкие ткани (400/40)</option>
+                  <option value="1500,-600" data-i18n="dicom.wl.lung">Лёгкие (1500/-600)</option>
+                  <option value="2000,500" data-i18n="dicom.wl.bone">Кость (2000/500)</option>
+                </select>
+              </label>
+              <button id="dcm-reset-wl" style="background:var(--panel); color:var(--text); border:1px solid var(--border); padding:3px 8px; cursor:pointer; font:12px sans-serif;" data-i18n="dicom.resetWl">Сброс W/L</button>
+              <button id="dcm-invert" style="background:var(--panel); color:var(--text); border:1px solid var(--border); padding:3px 8px; cursor:pointer; font:12px sans-serif;" data-i18n="dicom.invert">Инверсия</button>
+              <button id="dcm-magnifier" style="background:var(--panel); color:var(--text); border:1px solid var(--border); padding:3px 8px; cursor:pointer; font:12px sans-serif;" data-i18n="dicom.magnifier">Лупа</button>
+              <span class="tb-sep"></span>
+              <span class="dcm-caption" data-i18n="dicom.captionView">Вид</span>
+              <label style="color:var(--text-2); font:12px sans-serif; cursor:pointer; user-select:none;">
+                <input id="dcm-crosshair" type="checkbox" checked> <span data-i18n="dicom.crosshair">Перекрестия</span>
+              </label>
+              <button id="dcm-fit" style="background:var(--panel); color:var(--text); border:1px solid var(--border); padding:3px 8px; cursor:pointer; font:12px sans-serif;" data-i18n="dicom.fit">Вписать</button>
+              <button id="dcm-zoom-in" style="background:var(--panel); color:var(--text); border:1px solid var(--border); padding:3px 8px; cursor:pointer; font:12px sans-serif;">+</button>
+              <button id="dcm-zoom-out" style="background:var(--panel); color:var(--text); border:1px solid var(--border); padding:3px 8px; cursor:pointer; font:12px sans-serif;">−</button>
+              <button id="dcm-pan" style="background:var(--panel); color:var(--text); border:1px solid var(--border); padding:3px 8px; cursor:pointer; font:12px sans-serif;" data-i18n="dicom.pan">Перемещение</button>
+              <span style="color:var(--text-2); font:12px sans-serif; display:inline-flex; align-items:center; gap:4px;"><span data-i18n="dicom.layoutLabel">Раскладка:</span>
+                <span id="dcm-layout" style="display:inline-flex; gap:2px;">
+                  <button class="dcm-tool-btn active" data-layout="mpr" data-i18n-title="dicom.layout.titleMpr">2×2</button>
+                  <button class="dcm-tool-btn" data-layout="3d" data-i18n-title="dicom.layout.title3d">3D</button>
+                  <button class="dcm-tool-btn" data-layout="axial" data-i18n-title="label.axialFull"><span data-i18n="dicom.layout.axial">Акс.</span></button>
+                  <button class="dcm-tool-btn" data-layout="coronal" data-i18n-title="label.coronalFull"><span data-i18n="dicom.layout.coronal">Кор.</span></button>
+                  <button class="dcm-tool-btn" data-layout="sagittal" data-i18n-title="label.sagittalFull"><span data-i18n="dicom.layout.sagittal">Саг.</span></button>
+                </span>
+              </span>
+              <span class="tb-sep"></span>
+              <span class="dcm-caption" data-i18n="dicom.captionRender">Рендер</span>
+              <label style="color:var(--text-2); font:12px sans-serif;"><span data-i18n="dicom.slabLabel">Толщина (mm):</span>
+                <input id="dcm-slab" type="number" value="0" min="0" step="1" style="width:56px; background:var(--inset); color:var(--text); border:1px solid var(--border); padding:3px 6px;">
+              </label>
+              <select id="dcm-proj" data-i18n-title="dicom.proj.title" style="background:var(--inset); color:var(--text); border:1px solid var(--border); padding:3px 6px;">
+                <option value="max" data-i18n="dicom.proj.max">Максимум (MIP)</option>
+                <option value="min" data-i18n="dicom.proj.min">Минимум (MinIP)</option>
+                <option value="mean" data-i18n="dicom.proj.mean">Среднее (MeanIP)</option>
+              </select>
+              <select id="dcm-vol-preset" style="background:var(--inset); color:var(--text); border:1px solid var(--border); padding:3px 6px;">
+                <option value="" data-i18n="dicom.preset.label">3D пресет</option>
+                <option data-i18n="dicom.preset.soft">Мягкие ткани</option>
+                <option data-i18n="dicom.preset.bone">Кость</option>
+                <option data-i18n="dicom.preset.lung">Лёгкие</option>
+              </select>
+              <span class="tb-sep"></span>
+              <span class="dcm-caption" data-i18n="dicom.captionTilt">Наклон</span>
+              <label style="color:var(--text-2); font:12px sans-serif;"><span data-i18n="dicom.oblAz">Наклон саг. (°):</span>
+                <input id="dcm-obl-az" type="number" value="0" min="-45" max="45" step="1" style="width:50px; background:var(--inset); color:var(--text); border:1px solid var(--border); padding:3px 6px;">
+              </label>
+              <label style="color:var(--text-2); font:12px sans-serif;"><span data-i18n="dicom.oblEl">Наклон кор. (°):</span>
+                <input id="dcm-obl-el" type="number" value="0" min="-45" max="45" step="1" style="width:50px; background:var(--inset); color:var(--text); border:1px solid var(--border); padding:3px 6px;">
+              </label>
+            </div>
+            <div id="dcm-group-tools" class="dcm-tgroup-pane">
+              <button id="dcm-segment" data-i18n="dicom.segmentBody">Тело</button>
+              <button id="dcm-segment5" data-i18n="dicom.segmentAuto">Автосегментация</button>
+              <button id="dcm-grow-mode" data-i18n="dicom.growSeeds">Семена</button>
+              <button id="dcm-grow-run" data-i18n="dicom.growRun">Вырастить</button>
+              <button id="dcm-grow-clear" data-i18n="dicom.growClear">Очистить</button>
+              <label style="color:var(--text-2); font:12px sans-serif;"><span data-i18n="dicom.huLabel">± HU:</span>
+                <input id="dcm-grow-tol" type="number" value="30" min="1" max="2000" step="1" style="width:52px; background:var(--inset); color:var(--text); border:1px solid var(--border); padding:3px 6px;">
+              </label>
+              <span id="dcm-seg-list" style="display:flex; gap:10px; flex-wrap:wrap;"></span>
+            </div>
+            <div id="dcm-group-analysis" class="dcm-tgroup-pane">
+              <button id="dcm-histogram"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chart-column"></use></svg><span data-i18n="dicom.histogram">Гистограмма</span></button>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex; flex:1; min-height:0;">
+          <div id="dcm-explorer" style="width:200px; min-width:200px; border-right:1px solid var(--border); background:var(--panel-2); display:flex; flex-direction:column; overflow-y:auto;">
+            <div style="padding:8px 10px; border-bottom:1px solid var(--border); font-weight:bold; color:var(--text); display:flex; align-items:center; gap:6px;"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-folder-open"></use></svg><span data-i18n="dicom.explorer">Проводник</span></div>
+            <div class="dcm-sec">
+              <button class="dcm-sec-head" data-sec="patient"><span class="dcm-sec-caret">▾</span><svg class="g4c-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-info"></use></svg><span class="dcm-sec-label" data-i18n="dicom.sec.patient">Пациент</span></button>
+              <div class="dcm-sec-body" id="dcm-patient">
+                <div id="dcm-patient-name" style="color:var(--text); font:12px sans-serif; font-weight:bold;">Пациент: —</div>
+                <div id="dcm-patient-id" style="color:var(--text-2); font:11px sans-serif; margin-top:2px;"></div>
+              </div>
+            </div>
+            <div class="dcm-sec">
+              <button class="dcm-sec-head" data-sec="study"><span class="dcm-sec-caret">▾</span><svg class="g4c-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-file-text"></use></svg><span class="dcm-sec-label" data-i18n="dicom.sec.study">Исследование</span></button>
+              <div class="dcm-sec-body" id="dcm-study">
+                <div id="dcm-study-line" style="color:var(--text-2); font:11px sans-serif; line-height:1.4;">Исследование: —</div>
+              </div>
+            </div>
+            <div class="dcm-sec">
+              <button class="dcm-sec-head" data-sec="series"><span class="dcm-sec-caret">▾</span><svg class="g4c-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-image"></use></svg><span class="dcm-sec-label" data-i18n="dicom.sec.series">Серия</span></button>
+              <div class="dcm-sec-body" style="display:flex; flex-direction:column; gap:6px;">
+                <canvas id="dcm-thumb" width="176" height="176" style="width:100%; background:var(--inset); border:1px solid var(--border); display:block;"></canvas>
+                <div id="dcm-series-info" style="color:var(--text-2); font:11px sans-serif; line-height:1.4;">Серия не загружена</div>
+                <div id="dcm-rt-badge" style="display:none; align-items:center; gap:4px; color:var(--danger); font:11px sans-serif;"><svg class="g4c-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-medical-cross"></use></svg><span data-i18n="dicom.rt">РТ</span></div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; flex:1; min-width:0; position:relative;">
+            <div id="dcm-mpr" style="flex:1; min-height:0;"></div>
+            <div id="dcm-empty" style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; background:var(--bg); pointer-events:none;">
+              <svg class="g4c-icon" width="44" height="44" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--text-3)"><use href="#i-scan-line"></use></svg>
+              <div style="color:var(--text-2); font:13px var(--sans);" data-i18n="dicom.loadFileHint">Загрузите файл для начала просмотра</div>
+            </div>
+          </div>
+          <div id="dcm-rt-panel" style="width:270px; min-width:270px; border-left:1px solid var(--border); background:var(--panel-2); display:flex; flex-direction:column; overflow:hidden;">
+            <div style="padding:8px 10px; border-bottom:1px solid var(--border); font-weight:bold; color:var(--text); display:flex; align-items:center; gap:6px;"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-medical-cross"></use></svg><span data-i18n="dicom.rtTools">РТ-инструменты</span></div>
+            <div style="display:flex; border-bottom:1px solid var(--border);">
+              <button id="dcm-tab-draw" class="dcm-main-tab active" style="border-right:1px solid var(--border);"><svg class="g4c-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-pencil"></use></svg><span data-i18n="dicom.drawMeasure">Эскиз и измерения</span></button>
+              <button id="dcm-tab-rt" class="dcm-main-tab"><svg class="g4c-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-medical-cross"></use></svg><span data-i18n="dicom.rt">РТ</span></button>
+            </div>
+            <div id="dcm-pane-draw" style="flex:1; overflow-y:auto; display:flex; flex-direction:column;">
+              <div class="dcm-sec">
+                <button class="dcm-sec-head" data-sec="measure"><span class="dcm-sec-caret">▾</span><svg class="g4c-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-ruler-measure"></use></svg><span class="dcm-sec-label" data-i18n="dicom.sec.measure">Измерения</span></button>
+                <div class="dcm-sec-body" data-secbody="measure" style="display:grid; grid-template-columns:repeat(4, 1fr); gap:4px;">
+                  <button class="dcm-tool-btn" data-type="none" data-i18n-title="dicom.wl.none"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-sliders-horizontal"></use></svg></button>
+                  <button class="dcm-tool-btn" data-type="length" data-i18n-title="measure.length"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-ruler-measure"></use></svg></button>
+                  <button class="dcm-tool-btn" data-type="angle" data-i18n-title="measure.angle"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-angle"></use></svg></button>
+                  <button class="dcm-tool-btn" data-type="cobb" data-i18n-title="measure.cobb"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-triangle"></use></svg></button>
+                  <button class="dcm-tool-btn" data-type="perpendicular" data-i18n-title="measure.perpendicular"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-perpendicular"></use></svg></button>
+                  <button class="dcm-tool-btn" data-type="parallel" data-i18n-title="measure.parallel"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-parallel"></use></svg></button>
+                </div>
+              </div>
+              <div class="dcm-sec">
+                <button class="dcm-sec-head" data-sec="draw"><span class="dcm-sec-caret">▾</span><svg class="g4c-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-pencil"></use></svg><span class="dcm-sec-label" data-i18n="dicom.sec.draw">Эскиз</span></button>
+                <div class="dcm-sec-body" data-secbody="draw" style="display:grid; grid-template-columns:repeat(4, 1fr); gap:4px;">
+                  <button class="dcm-tool-btn" data-type="polyline" data-i18n-title="measure.polyline"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-pen-line"></use></svg></button>
+                  <button class="dcm-tool-btn" data-type="rectangle" data-i18n-title="measure.rectangle"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-rectangle"></use></svg></button>
+                  <button class="dcm-tool-btn" data-type="ellipse" data-i18n-title="measure.ellipse"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-circle"></use></svg></button>
+                  <button class="dcm-tool-btn" data-type="polygon" data-i18n-title="measure.polygon"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-polygon"></use></svg></button>
+                  <button class="dcm-tool-btn" data-type="spline" data-i18n-title="measure.spline"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-spline"></use></svg></button>
+                  <button class="dcm-tool-btn" data-type="curve" data-i18n-title="measure.curve"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-circle-dashed"></use></svg></button>
+                  <button class="dcm-tool-btn" data-type="freehand" data-i18n-title="measure.freehand"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-brush"></use></svg></button>
+                </div>
+              </div>
+              <div class="dcm-sec">
+                <button class="dcm-sec-head" data-sec="options"><span class="dcm-sec-caret">▾</span><svg class="g4c-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-sliders-horizontal"></use></svg><span class="dcm-sec-label" data-i18n="dicom.sec.options">Параметры</span></button>
+                <div class="dcm-sec-body" data-secbody="options" style="display:flex; flex-direction:column; gap:6px;">
+                  <div style="display:flex; gap:6px;">
+                    <button id="dcm-measure-done" style="flex:1; padding:4px 8px; background:var(--panel); color:var(--text); border:1px solid var(--border); cursor:pointer; font:11px sans-serif;" data-i18n="dicom.finish">Завершить</button>
+                    <button id="dcm-measure-clear" style="flex:1; padding:4px 8px; background:var(--panel); color:var(--text); border:1px solid var(--border); cursor:pointer; font:11px sans-serif;" data-i18n="tools.clear">Очистить</button>
+                  </div>
+                  <label style="color:var(--text-2); font:12px sans-serif;"><span data-i18n="dicom.opacity">Прозрачность:</span> <span id="dcm-opacity-val">100%</span></label>
+                  <input id="dcm-opacity" type="range" min="0" max="100" value="100" style="width:100%;">
+                </div>
+              </div>
+              <div class="dcm-sec">
+                <button class="dcm-sec-head" data-sec="sel"><span class="dcm-sec-caret">▾</span><svg class="g4c-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-target"></use></svg><span class="dcm-sec-label" data-i18n="dicom.sec.sel">Выбранное измерение</span></button>
+                <div class="dcm-sec-body" data-secbody="sel">
+                  <div id="dcm-measure-value" style="color:#ffd966; font:12px monospace; white-space:pre-line; line-height:1.4;"></div>
+                </div>
+              </div>
+              <div class="dcm-sec">
+                <button class="dcm-sec-head" data-sec="measurements"><span class="dcm-sec-caret">▾</span><svg class="g4c-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chart-line"></use></svg><span class="dcm-sec-label" data-i18n="dicom.sec.measurements">Список измерений</span></button>
+                <div class="dcm-sec-body" data-secbody="measurements">
+                  <div id="dcm-measure-list" style="display:flex; flex-direction:column; gap:2px;"></div>
+                </div>
+              </div>
+              <div class="dcm-sec">
+                <button class="dcm-sec-head" data-sec="volumes"><span class="dcm-sec-caret">▾</span><svg class="g4c-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-box"></use></svg><span class="dcm-sec-label" data-i18n="dicom.sec.volumes">Объёмы</span></button>
+                <div class="dcm-sec-body" data-secbody="volumes">
+                  <div id="dcm-volume-list" style="display:flex; flex-direction:column; gap:2px;"></div>
+                </div>
+              </div>
+              <div class="dcm-sec">
+                <button class="dcm-sec-head" data-sec="volsel"><span class="dcm-sec-caret">▾</span><svg class="g4c-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-layers"></use></svg><span class="dcm-sec-label" data-i18n="dicom.sec.volsel">Выбранный объём</span></button>
+                <div class="dcm-sec-body" data-secbody="volsel">
+                  <div id="dcm-volume-value" style="color:#ffd966; font:12px monospace; white-space:pre-line; line-height:1.4;"></div>
+                </div>
+              </div>
+              <div class="dcm-sec">
+                <button class="dcm-sec-head" data-sec="transfer"><span class="dcm-sec-caret">▾</span><svg class="g4c-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-upload"></use></svg><span class="dcm-sec-label" data-i18n="dicom.sec.transfer">Перенос в ядро</span></button>
+                <div class="dcm-sec-body" data-secbody="transfer" style="display:flex; flex-direction:column; gap:6px;">
+                  <div style="display:flex; gap:6px; align-items:center;">
+                    <label style="color:var(--text-2); font:12px sans-serif;"><span data-i18n="dicom.slices">Срезы:</span></label>
+                    <input id="dcm-tr-from" type="number" min="0" style="width:56px; background:var(--inset); color:var(--text); border:1px solid var(--border); padding:2px 4px;">
+                    <span style="color:var(--text-3);">–</span>
+                    <input id="dcm-tr-to" type="number" min="0" style="width:56px; background:var(--inset); color:var(--text); border:1px solid var(--border); padding:2px 4px;">
+                  </div>
+                  <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                    <label style="color:var(--text-2); font:12px sans-serif;"><span data-i18n="dicom.center">Центр (мм):</span></label>
+                    <input id="dcm-tr-pos-x" type="number" step="1" placeholder="x" style="width:56px; background:var(--inset); color:var(--text); border:1px solid var(--border); padding:2px 4px;">
+                    <input id="dcm-tr-pos-y" type="number" step="1" placeholder="y" style="width:56px; background:var(--inset); color:var(--text); border:1px solid var(--border); padding:2px 4px;">
+                    <input id="dcm-tr-pos-z" type="number" step="1" placeholder="z" style="width:56px; background:var(--inset); color:var(--text); border:1px solid var(--border); padding:2px 4px;">
+                    <span style="color:var(--text-3); font:11px sans-serif;"><span data-i18n="dicom.emptyAbsLps">(пусто = абсолютный DICOM LPS)</span></span>
+                  </div>
+                  <select id="dcm-tr-mode" style="background:var(--inset); color:var(--text); border:1px solid var(--border); padding:3px 6px;">
+                    <option value="0" data-i18n="dicom.trMode.all">Весь диапазон срезов</option>
+                    <option value="1" data-i18n="dicom.trMode.marked">Только помеченные объёмы</option>
+                    <option value="2" data-i18n="dicom.trMode.body">Только остальное тело</option>
+                  </select>
+                  <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                    <label style="color:var(--text-2); font:12px sans-serif;"><span data-i18n="dicom.huTableLabel">HU-таблица:</span></label>
+                    <button id="dcm-hu-table-btn" style="background:var(--border-soft); color:#9cf; border:1px solid var(--border); padding:3px 8px; cursor:pointer; font:12px sans-serif;" data-i18n="dicom.choose">Выбрать…</button>
+                    <span id="dcm-hu-table-value" style="color:var(--text-3); font:11px sans-serif; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:220px;" data-i18n="dicom.huDefault">по умолчанию (Schneider)</span>
+                  </div>
+                  <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                    <label style="color:var(--text-2); font:12px sans-serif;"><span data-i18n="dicom.densityLabel">Плотность (HU→г/см³):</span></label>
+                    <button id="dcm-density-table-btn" style="background:var(--border-soft); color:#9cf; border:1px solid var(--border); padding:3px 8px; cursor:pointer; font:12px sans-serif;" data-i18n="dicom.choose">Выбрать…</button>
+                    <span id="dcm-density-table-value" style="color:var(--text-3); font:11px sans-serif; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:220px;" data-i18n="dicom.densityDefault">по умолчанию (якоря ICRP)</span>
+                  </div>
+                  <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                    <label style="color:var(--text-2); font:12px sans-serif;"><span data-i18n="dicom.paramLabel">Параметризация:</span></label>
+                    <select id="dcm-parametrisation" style="background:var(--inset); color:var(--text); border:1px solid var(--border); padding:3px 6px;">
+                      <option value="regular">regular (G4PhantomParameterisation)</option>
+                      <option value="nested">nested (GATE-style)</option>
+                    </select>
+                  </div>
+                  <button id="dcm-transfer" style="background:var(--border-soft); color:#ffd966; border:1px solid var(--border); padding:4px 8px; cursor:pointer; font:12px sans-serif;" data-i18n="dicom.transferBtn">Перенести в ядро</button>
+                  <div id="dcm-tr-result" style="color:var(--text-2); font:11px monospace; white-space:pre-line; line-height:1.3;"></div>
+                </div>
+              </div>
+
+            </div>
+            <div id="dcm-pane-rt" style="flex:1; overflow-y:auto; display:none; flex-direction:column;">
+              <div style="padding:8px 10px; border-bottom:1px solid var(--border); display:flex; flex-direction:column; gap:6px;">
+                <div style="color:var(--text-2); font:12px sans-serif;"><span data-i18n="dicom.planLabel">План:</span>
+                  <select id="dcm-plan-sel" style="background:var(--inset); color:var(--text); border:1px solid var(--border); padding:2px 4px; max-width:100%;"></select>
+                </div>
+                <div id="dcm-plan-dose" style="color:var(--text-2); font:12px sans-serif;">Доза: —</div>
+                <label style="color:var(--text-2); font:12px sans-serif; display:flex; align-items:center; gap:4px; cursor:pointer;">
+                  <input id="dcm-beams-visible" type="checkbox" checked> <span data-i18n="dicom.beams3d">Пучки (3D)</span>
+                </label>
+                <button id="dcm-dvh-btn"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chart-line"></use></svg><span data-i18n="dicom.dvhBtn">DVH-график</span></button>
+              </div>
+              <div style="display:flex; border-bottom:1px solid var(--border);">
+                <button id="dcm-tab-struct" style="flex:1; padding:6px; background:var(--panel-2); color:var(--text-2); border:none; border-right:1px solid var(--border); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:4px;"><svg class="g4c-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-activity"></use></svg><span data-i18n="dicom.structsTab">Структуры</span></button>
+                <button id="dcm-tab-isodose" style="flex:1; padding:6px; background:var(--panel-2); color:var(--text-3); border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:4px;"><svg class="g4c-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chart-column"></use></svg><span data-i18n="dicom.isodoseTab">Изодозы</span></button>
+              </div>
+              <div id="dcm-roi-list" style="flex:1; overflow-y:auto; padding:6px 10px; display:flex; flex-direction:column; gap:2px;"></div>
+              <div id="dcm-dose-list" style="display:none; flex:1; overflow-y:auto; padding:6px 10px; flex-direction:column; gap:6px;"></div>
+              <div id="dcm-struct-info" style="border-top:1px solid var(--border); padding:8px 10px; font:12px monospace; color:var(--text-2); min-height:56px; line-height:1.5;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="progress"><div id="bar"></div></div>
+      <div id="console">
+        <div id="console-head">
+          <button class="ctab active" data-ctab="log" data-i18n="console.log">Журнал</button>
+          <button class="ctab" data-ctab="console" data-i18n="console.console">Консоль</button>
+          <button class="ctab" data-ctab="errors" data-i18n="console.errors">Ошибки</button>
+          <button id="console-collapse" data-i18n-title="console.collapse" title="Свернуть/развернуть"><svg class="g4c-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chevron-down"></use></svg></button>
+        </div>
+        <div id="console-body">
+          <div id="log" class="active"></div>
+          <div id="console-pane"></div>
+          <div id="errors-pane"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="cmdline">
+    <span id="cmd-prompt">Idle&gt;</span>
+    <input id="cmd-input" type="text" placeholder="/run/beamOn 100" spellcheck="false" autocomplete="off">
+  </div>
+  <div id="dvh-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.55); z-index:100;">
+    <div style="margin:20px auto; width:680px; max-width:94vw; max-height:calc(100vh - 40px); overflow-y:auto; background:var(--bg); border:1px solid var(--border); padding:16px; border-radius:4px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div style="font-weight:bold;">DVH</div>
+        <button id="dvh-close" style="background:var(--panel); color:var(--text-2); border:1px solid var(--border); cursor:pointer; padding:2px 8px;">✕</button>
+      </div>
+      <div id="dvh-plot" style="width:640px; max-width:100%; height:380px;"></div>
+      <div style="display:flex; gap:8px; margin-top:8px; align-items:center; flex-wrap:wrap;">
+        <button id="dvh-save-png" style="background:var(--panel); color:var(--text-2); border:1px solid var(--border); cursor:pointer; padding:3px 10px;">Save PNG</button>
+        <button id="dvh-export-csv" style="background:var(--panel); color:var(--text-2); border:1px solid var(--border); cursor:pointer; padding:3px 10px;">Export CSV</button>
+        <label style="color:var(--text-2); font:12px sans-serif; cursor:pointer;"><input id="dvh-logx" type="checkbox"> Log X</label>
+        <span style="color:var(--text-3); font:11px sans-serif;" data-i18n="plot.hint">ПКМ — настройки графика</span>
+      </div>
+      <div id="dvh-metrics" style="margin-top:10px; font:12px monospace; color:var(--text-2); line-height:1.5; max-height:200px; overflow-y:auto;"></div>
+    </div>
+  </div>
+  <div id="hist-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.55); z-index:100;">
+    <div style="margin:20px auto; width:680px; max-width:94vw; max-height:calc(100vh - 40px); overflow-y:auto; background:var(--bg); border:1px solid var(--border); padding:16px; border-radius:4px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div style="font-weight:bold;" data-i18n="plot.histogram">Гистограмма</div>
+        <button id="hist-close" style="background:var(--panel); color:var(--text-2); border:1px solid var(--border); cursor:pointer; padding:2px 8px;">✕</button>
+      </div>
+      <div id="hist-plot" style="width:640px; max-width:100%; height:380px;"></div>
+      <div style="display:flex; gap:8px; margin-top:8px; align-items:center;">
+        <button id="hist-save-png" style="background:var(--panel); color:var(--text-2); border:1px solid var(--border); cursor:pointer; padding:3px 10px;">Save PNG</button>
+        <span style="color:var(--text-3); font:11px sans-serif;" data-i18n="plot.hint">ПКМ — настройки графика</span>
+      </div>
+    </div>
+  </div>
+  <div id="settings-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.55); z-index:100;">
+    <div style="margin:90px auto; width:340px; background:var(--bg); border:1px solid var(--border); padding:16px; border-radius:4px;">
+      <div style="font-weight:bold; margin-bottom:14px;" data-i18n="settings.title">Настройки</div>
+      <label style="display:flex; align-items:center; gap:8px; margin-bottom:14px;">
+        <span data-i18n="settings.language">Язык</span>
+        <select id="set-language" style="background:var(--inset); color:var(--text); border:1px solid var(--border); padding:3px 6px;">
+          <option value="ru">Русский</option>
+          <option value="en">English</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+        </select>
+      </label>
+      <label style="display:flex; align-items:center; gap:8px; margin-bottom:14px;">
+        <span data-i18n="settings.axesSize">Размер осей (%):</span>
+        <input id="set-axes-size" type="number" value="20" min="8" max="50" step="2" style="width:70px; background:var(--inset); color:var(--text); border:1px solid var(--border); padding:3px 6px;">
+      </label>
+      <div style="border-top:1px solid var(--border); margin:6px 0 12px;"></div>
+      <div style="font-weight:bold; margin-bottom:10px;" data-i18n="settings.simulation">Симуляция</div>
+      <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+        <span data-i18n="settings.verbosity">Детализация (0-2):</span>
+        <input id="set-verbosity" type="number" value="0" min="0" max="2" step="1" style="width:60px; background:var(--inset); color:var(--text); border:1px solid var(--border); padding:3px 6px;">
+      </label>
+      <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+        <span data-i18n="settings.threads">Потоки:</span>
+        <input id="set-nthreads" type="number" value="1" min="1" step="1" style="width:60px; background:var(--inset); color:var(--text); border:1px solid var(--border); padding:3px 6px;">
+      </label>
+      <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+        <span data-i18n="settings.seed">Зерно (seed):</span>
+        <input id="set-seed1" type="number" value="123" step="1" style="width:70px; background:var(--inset); color:var(--text); border:1px solid var(--border); padding:3px 6px;">
+        <input id="set-seed2" type="number" value="2004" step="1" style="width:70px; background:var(--inset); color:var(--text); border:1px solid var(--border); padding:3px 6px;">
+      </label>
+      <div style="border-top:1px solid var(--border); margin:6px 0 12px;"></div>
+      <div style="font-weight:bold; margin-bottom:10px;" data-i18n="settings.dataRecording">Запись данных</div>
+      <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+        <span data-i18n="settings.outputFile">Файл вывода:</span>
+        <input id="set-output-file" type="text" value="output.root" style="flex:1; background:var(--inset); color:var(--text); border:1px solid var(--border); padding:3px 6px;">
+      </label>
+      <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+        <span data-i18n="settings.compression">Сжатие:</span>
+        <select id="set-compression-algo" style="background:var(--inset); color:var(--text); border:1px solid var(--border); padding:3px 6px;">
+          <option value="zstd">ZSTD</option>
+          <option value="zlib">ZLIB</option>
+          <option value="lz4">LZ4</option>
+          <option value="lzma">LZMA</option>
+        </select>
+        <span data-i18n="settings.level">Уровень:</span>
+        <input id="set-compression-level" type="number" value="5" min="0" max="9" step="1" style="width:56px; background:var(--inset); color:var(--text); border:1px solid var(--border); padding:3px 6px;">
+      </label>
+      <label style="display:flex; align-items:center; gap:8px; margin-bottom:14px;">
+        <span data-i18n="settings.cluster">Кластер (МБ):</span>
+        <input id="set-cluster-size" type="number" value="128" min="1" step="1" style="width:70px; background:var(--inset); color:var(--text); border:1px solid var(--border); padding:3px 6px;">
+        <span data-i18n="settings.page">Страница (КБ):</span>
+        <input id="set-page-size" type="number" value="1024" min="1" step="1" style="width:70px; background:var(--inset); color:var(--text); border:1px solid var(--border); padding:3px 6px;">
+      </label>
+      <div style="text-align:right;">
+        <button id="set-cancel"><span data-i18n="settings.cancel">Отмена</span></button>
+        <button id="set-apply"><span data-i18n="settings.apply">Применить</span></button>
+      </div>
+    </div>
+  </div>
+  <div id="root-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.55); z-index:100;">
+    <div style="margin:20px auto; width:860px; max-width:94vw; height:calc(100vh - 40px); overflow:hidden; background:var(--bg); border:1px solid var(--border); padding:16px; border-radius:4px; display:flex; flex-direction:column;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div style="font-weight:bold;" data-i18n="root.title">ROOT-просмотрщик (JSROOT)</div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button id="btn-open-root" style="background:var(--panel); color:var(--text-2); border:1px solid var(--border); cursor:pointer; padding:3px 10px;" data-i18n="msg.openRootFile">Открыть ROOT-файл</button>
+          <input type="file" id="root-file" accept=".root" style="display:none;">
+          <span id="root-fname" style="color:var(--text-3); font:11px sans-serif;"></span>
+          <button id="root-modal-close" style="background:var(--panel); color:var(--text-2); border:1px solid var(--border); cursor:pointer; padding:2px 8px;">✕</button>
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; flex:1; min-height:0;">
+        <div id="root-keys" style="width:260px; min-width:200px; overflow-y:auto; border:1px solid var(--border); padding:6px; font:12px sans-serif;"></div>
+        <div id="root-draw" style="flex:1; overflow:auto; border:1px solid var(--border); min-height:0;"></div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/renderer.js"></script>
+</body>
+</html>

@@ -1,8 +1,12 @@
 //==============================================================================
-// G4CARE cloud — S3-compatible object storage (MinIO, SeaweedFS, AWS, …).
+// G4CARE - storage-s3.ts — Cloud backend: S3 storage
 //
-// Implements the same ObjectStore contract as FileStorage, so the server can
-// swap between local files and S3-compatible storage without changing routes.
+// Cloud backend: S3 storage
+//
+// @author I. I. Everstov  @author V. F. Myshkin (Scientific Supervisor)
+// @date 2026-11-11  @version 0.9.3
+// @copyright Copyright (c) 2026 G4CARE Developers
+// @license SPDX-License-Identifier: Apache-2.0
 //==============================================================================
 
 import { Client } from 'minio';

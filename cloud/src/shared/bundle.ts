@@ -1,8 +1,12 @@
 //==============================================================================
-// G4CARE cloud — bundle packing / unpacking (gzipped tarball + manifest.toml).
+// G4CARE - bundle.ts — Cloud shared: bundle
 //
-// A bundle is a `.g4c` tarball containing a `manifest.toml` (metadata + file
-// list with SHA-256) plus the referenced files at relative paths.
+// Cloud shared: bundle
+//
+// @author I. I. Everstov  @author V. F. Myshkin (Scientific Supervisor)
+// @date 2026-11-11  @version 0.9.3
+// @copyright Copyright (c) 2026 G4CARE Developers
+// @license SPDX-License-Identifier: Apache-2.0
 //==============================================================================
 
 import * as tar from 'tar';

@@ -1,8 +1,12 @@
 //==============================================================================
-// G4CARE cloud — PostgreSQL metadata index.
+// G4CARE - index-pg.ts — Cloud backend: PostgreSQL entry
 //
-// Implements the same MetadataIndex contract as JsonIndex, backed by the
-// schema in migrations/001_init.sql (artifacts + tags tables).
+// Cloud backend: PostgreSQL entry
+//
+// @author I. I. Everstov  @author V. F. Myshkin (Scientific Supervisor)
+// @date 2026-11-11  @version 0.9.3
+// @copyright Copyright (c) 2026 G4CARE Developers
+// @license SPDX-License-Identifier: Apache-2.0
 //==============================================================================
 
 import { Pool } from 'pg';

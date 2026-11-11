@@ -455,7 +455,7 @@ void RadioactiveSource::GeneratePrimaries(G4Event* event) {
                << " lifetime=" << iso.cachedIon->GetPDGLifeTime()/CLHEP::ns << " ns"
                << G4endl;
 
-        BeamAnalysis::Instance()->Fill("primary", UnifiedSource(vertex, particle));
+        BeamAnalysis::Instance()->Fill("primary", UnifiedSource(vertex, particle, fSourceName));
             }
 }
 

@@ -60,32 +60,10 @@
 /// @param cache             Thread-local cache for run/event IDs.
 /// @param xsCalc            Cross-section calculator (owned by BeamAnalysis).
 /// @param registry          Volume-material registry for material/lookup.
-/// @param particleNameReg   Typed registry for particle name strings.
-/// @param volumeNameReg     Typed registry for volume name strings.
-/// @param materialNameReg   Typed registry for material name strings.
-/// @param regionNameReg     Typed registry for region name strings.
-/// @param sourceNameReg     Typed registry for source name strings.
-/// @param detectorNameReg   Typed registry for detector name strings.
-/// @param touchablePathReg  Typed registry for touchable path strings.
-/// @param chemicalFormulaReg Typed registry for chemical formula strings.
-/// @param pdgReg            Typed registry for PDG code → int mapping.
-/// @param massReg           Typed registry for particle mass values.
-/// @param chargeReg         Typed registry for particle charge values.
 /// @param chemSpeciesReg    Typed registry for chemical species names.
 DataExtractor::DataExtractor(ThreadCache& cache,
                              CrossSectionCalculator* xsCalc,
                              VolumeMaterialRegistry* registry,
-                             TypedRegistry<std::string>* particleNameReg,
-                             TypedRegistry<std::string>* volumeNameReg,
-                             TypedRegistry<std::string>* materialNameReg,
-                             TypedRegistry<std::string>* regionNameReg,
-                             TypedRegistry<std::string>* sourceNameReg,
-                             TypedRegistry<std::string>* detectorNameReg,
-                             TypedRegistry<std::string>* touchablePathReg,
-                             TypedRegistry<std::string>* chemicalFormulaReg,
-                             TypedRegistry<int>* pdgReg,
-                             TypedRegistry<double>* massReg,
-                             TypedRegistry<double>* chargeReg,
                              TypedRegistry<std::string>* chemSpeciesReg)
     : fCache(cache),
       fXSCalculator(xsCalc),
@@ -94,9 +72,9 @@ DataExtractor::DataExtractor(ThreadCache& cache,
       fStep(),
       fTrack(),
       fProcess(),
-      fParticle(particleNameReg, pdgReg, massReg, chargeReg),
-      fMaterial(registry, materialNameReg, chemicalFormulaReg),
-      fGeometry(registry, volumeNameReg, regionNameReg, touchablePathReg),
+      fParticle(),
+      fMaterial(registry),
+      fGeometry(registry),
       fCrossSection(xsCalc),
       fChemistry(chemSpeciesReg),
       fChemSpeciesReg(chemSpeciesReg),
@@ -322,10 +300,22 @@ double DataExtractor::GetDouble(ColType type, const UnifiedSource& src, int even
             return fChemistry.Get(type, src);
 
         // ========== Digit-specific fields ==========
+        case ColType::RawEnergy:
+        case ColType::DigitEnergy:
+        case ColType::CoincidenceID:
+        case ColType::RawTime:
+        case ColType::PileupSize:
+        case ColType::IsPileup:
+        case ColType::QuantumEfficiency:
+        case ColType::NoiseEnergy:
+        case ColType::DigitType:
+        case ColType::DetectorID:
         if (src.GetType() == UnifiedSource::Type::Digit) {
             const Digit* dig = src.GetDigit();
             if (dig) {
                 switch (type) {
+                    case ColType::CoincidenceID: return dig->GetCoincidenceID();
+                    case ColType::DigitEnergy: return dig->GetEnergy() / MeV;
                     case ColType::RawEnergy: return dig->GetRawEnergy() / MeV;
                     case ColType::RawTime: return dig->GetRawTime() / ns;
                     case ColType::PileupSize: return static_cast<double>(dig->GetPileupSize());
@@ -339,6 +329,25 @@ double DataExtractor::GetDouble(ColType type, const UnifiedSource& src, int even
                 }
             }
         }
+
+        // ========== Raw SD-hit (tracker hit) fields ==========
+        case ColType::HitEdep:
+        case ColType::StripNumber:
+        case ColType::PlaneNumber:
+        case ColType::IsXPlane:
+        if (src.GetType() == UnifiedSource::Type::SDHit) {
+            const Hit* h = src.GetSDHit();
+            if (h) {
+                switch (type) {
+                    case ColType::HitEdep: return h->GetEdep() / MeV;
+                    case ColType::StripNumber: return static_cast<double>(h->GetStripNumber());
+                    case ColType::PlaneNumber: return static_cast<double>(h->GetPlaneNumber());
+                    case ColType::IsXPlane: return static_cast<double>(h->GetIsXPlane());
+                    default: break;
+                }
+            }
+        }
+        return 0.0;
 
         default:
             return 0.0;
@@ -376,6 +385,24 @@ std::string DataExtractor::GetString(ColType type, const UnifiedSource& src) con
         case ColType::CreatorProcessName:
         case ColType::StepLimitingProcess:
             return fProcess.GetString(type, src);
+
+        // Source / detector
+        case ColType::SourceName:
+            return src.GetSourceName();
+
+        case ColType::DetectorName: {
+            const Digit* d = src.GetDigit();
+            if (d) {
+                auto* reg = BeamAnalysis::Instance()->GetDetectorRegistry();
+                if (reg) return reg->GetName(d->GetDetectorID());
+            }
+            const Hit* h = src.GetSDHit();
+            if (h) {
+                auto* reg = BeamAnalysis::Instance()->GetDetectorRegistry();
+                if (reg) return reg->GetName(h->GetDetectorID());
+            }
+            return "";
+        }
 
         default:
             return "";

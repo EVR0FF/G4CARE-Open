@@ -44,18 +44,7 @@ public:
     DataExtractor(ThreadCache& cache,
                   CrossSectionCalculator* xsCalc,
                   VolumeMaterialRegistry* registry,
-                  TypedRegistry<std::string>* particleNameReg,
-                  TypedRegistry<std::string>* volumeNameReg,
-                  TypedRegistry<std::string>* materialNameReg,
-                  TypedRegistry<std::string>* regionNameReg,
-                  TypedRegistry<std::string>* sourceNameReg,
-                  TypedRegistry<std::string>* detectorNameReg,
-                  TypedRegistry<std::string>* touchablePathReg,
-                  TypedRegistry<std::string>* chemicalFormulaReg,
-                  TypedRegistry<int>* pdgReg,
-                  TypedRegistry<double>* massReg,
-                  TypedRegistry<double>* chargeReg,
-                  TypedRegistry<std::string>* fChemSpeciesReg);
+                  TypedRegistry<std::string>* chemSpeciesReg);
 
     [[nodiscard]] double GetDouble(ColType type, const UnifiedSource& src, int eventId) const;
     [[nodiscard]] std::string GetString(ColType type, const UnifiedSource& src) const;
@@ -85,17 +74,6 @@ private:
     DetectorEffectsExtractor fDetectorEffects;
     ChemistryExtractor fChemistry;
 
-    TypedRegistry<std::string>* fParticleNameReg;
-    TypedRegistry<std::string>* fVolumeNameReg;
-    TypedRegistry<std::string>* fMaterialNameReg;
-    TypedRegistry<std::string>* fRegionNameReg;
-    TypedRegistry<std::string>* fSourceNameReg;
-    TypedRegistry<std::string>* fDetectorNameReg;
-    TypedRegistry<std::string>* fTouchablePathReg;
-    TypedRegistry<std::string>* fChemicalFormulaReg;
-    TypedRegistry<int>* fPDGReg;
-    TypedRegistry<double>* fMassReg;
-    TypedRegistry<double>* fChargeReg;
     TypedRegistry<std::string>* fChemSpeciesReg;
 };
 

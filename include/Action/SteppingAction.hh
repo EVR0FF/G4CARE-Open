@@ -11,8 +11,8 @@
 //   - Accumulates energy deposition in chemistry volumes for dose
 //     monitoring (global atomic accumulator sAccumulatedEnergyJ).
 //   - Fills the "g4care" NTuple via BeamAnalysis.
-//   - If EXPRS blocks exist, builds FilterVars and executes step-level
-//     ExprTK scripts via ExprsManager.
+//   - If SCRIPT.scripts exist, builds FilterVars and executes step-level
+//     ExprTK scripts via ScriptsManager.
 //
 //   At event end, AccumulateEventEnergy() atomically merges the
 //   per-event (thread-local) energy into the global counter and
@@ -83,6 +83,12 @@ public:
     /// @return Reference to the static unordered_set of volume names.
     static const std::unordered_set<std::string>& GetChemVolumeNames() { return sChemVolumeNames; }
 
+    /// @brief Total number of steps across all threads (lock-free counter).
+    static unsigned long long GetStepCount() { return sStepCount.load(std::memory_order_relaxed); }
+
+    /// @brief Reset the step counter (called from RunAction::BeginOfRunAction).
+    static void ResetStepCount() { sStepCount.store(0, std::memory_order_relaxed); }
+
 private:
     // Global lock-free energy accumulator (Joules)
     static std::atomic<double> sAccumulatedEnergyJ;
@@ -90,6 +96,9 @@ private:
     static double              sTargetMassKg;
     static std::string         sSensitiveVolumeName;
     static std::atomic<bool>   sEnabled;
+
+    // Lock-free step counter (perf benchmarking: steps/s).
+    static std::atomic<unsigned long long> sStepCount;
 
     // Chemistry volumes (for G-factor scoring): set of names and enable flag
     static std::unordered_set<std::string> sChemVolumeNames;

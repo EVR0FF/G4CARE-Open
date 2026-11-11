@@ -1,0 +1,9 @@
+# HU -> density calibration curve (g/cm3), GATE-style "densities.txt".
+# Density is piecewise-linearly interpolated between the points below.
+# '#' starts a comment; blank lines are ignored.
+-1000  0.0012
+-600   0.26
+-100   0.95
+50     1.05
+300    1.33
+1200   1.92

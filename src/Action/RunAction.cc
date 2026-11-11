@@ -5,7 +5,7 @@
 // @details Implements BeginOfRunAction and EndOfRunAction for G4CARE.
 //   Handles ROOT file creation, ntuple booking, target positioning,
 //   chemistry species registration, chemistry state save/load,
-//   G-factor scoring setup, G4MoleculeCounter reset, EXPRS script
+//   G-factor scoring setup, G4MoleculeCounter reset, SCRIPT.scripts script
 //   execution with chemistry vectors (Nc, Nt, Gc, Gt, charge), VTK
 //   export of adaptive scoring grids, and weight-window statistics
 //   saving in collect mode.
@@ -31,6 +31,7 @@
 #include <iomanip>
 #include "PositionSampler.hh"
 #include "G4ios.hh"
+#include "LogVerbose.hh"
 #include "G4Timer.hh"
 #include "TrackingAction.hh"
 #include "MoleculeIO.hh"
@@ -40,12 +41,13 @@
 #include "Randomize.hh"
 #include "Run.hh"
 #include "AdaptiveScoringManager.hh"
-#include "ExprsManager.hh"
+#include "ScriptsManager.hh"
 #include "G4TransportationManager.hh"
 #include "G4LogicalVolumeStore.hh"
 #include "G4NistManager.hh"
 #include "G4Material.hh"
 #include "SteppingAction.hh"
+#include "DoseScorer.hh"
 #include "ITSteppingAction.hh"
 #include "ITTrackingInteractivity.hh"
 #include "G4Scheduler.hh"
@@ -123,11 +125,6 @@ RunAction::RunAction(PrimaryGeneratorAction* primaryGen, GeometryManager* geomMa
     fEnabled = ConfigManager::Instance()->GetBool("RUNACTION_ENABLE", true);
     fVerbose = ConfigManager::Instance()->GetInt("RUNACTION_VERBOSE", 0);
 
-    auto* man = G4AnalysisManager::Instance();
-    if (G4Threading::IsMultithreadedApplication()) {
-        man->SetNtupleMerging(true);
-    }
-    man->SetDefaultFileType("root");
     BeamAnalysis::Instance()->Initialize();
 }
 
@@ -149,12 +146,16 @@ G4Run* RunAction::GenerateRun() {
 /// chemistry species from configuration, creates BeamAnalysis trees,
 /// resets molecule counters, optionally loads chemistry state from
 /// disk, applies weight-window weights, sets detector registry,
-/// resets ExprsManager blocks, resets chemistry accumulation, and
+/// resets ScriptsManager blocks, resets chemistry accumulation, and
 /// computes the cached target mass.
 /// @param run Pointer to the current G4Run
 void RunAction::BeginOfRunAction(const G4Run* run) {
     auto* cfg = ConfigManager::Instance();
     cfg->InvalidateThreadCache();
+
+    // Reset perf counters (steps/tracks) for this run.
+    SteppingAction::ResetStepCount();
+    TrackingAction::ResetTrackCount();
 
     auto* geomMgr = fGeometryManager;
     auto* scoringMgr = AdaptiveScoringManager::Instance();
@@ -184,16 +185,17 @@ void RunAction::BeginOfRunAction(const G4Run* run) {
 
     SteppingAction::InitializeDoseControl(geomMgr);
 
+    // Prepare the RTDOSE voxel dose-grid scorer (master thread only).
+    if (G4Threading::IsMasterThread()) {
+        size_t nThreads = G4Threading::GetNumberOfRunningWorkerThreads();
+        if (nThreads == 0) nThreads = 1;
+        DoseScorer::Instance()->BeginOfRun(nThreads);
+    }
+
     if (!fEnabled) return;
 
     auto* beam = BeamAnalysis::Instance();
-    auto* man = G4AnalysisManager::Instance();
 
-    if (!fExternalFileMgmt) {
-        std::string outFile = cfg->GetString("OUTPUT_FILE", "output.root");
-        man->SetFileName(outFile);
-        G4bool ok = man->OpenFile(outFile);
-    }
 
     bool chemEnabled = cfg->GetBool("CHEMISTRY.ENABLE", false);
     {
@@ -236,6 +238,11 @@ void RunAction::BeginOfRunAction(const G4Run* run) {
     beam->CreateTrees();
     beam->BeginRun();
 
+    // Columnar RNTuple output (OUTPUT config): open per-thread stream files.
+    if (beam->GetOutputManager()->IsEnabled()) {
+        beam->GetOutputManager()->BeginOfRun(beam->GetOutputManager()->GetOutFile(), G4Threading::G4GetThreadId());
+    }
+
     G4MoleculeCounterManager::Instance()->ResetCounters();
 
     if (chemEnabled && G4DNAChemistryManager::GetInstanceIfExists() != nullptr) {
@@ -274,7 +281,7 @@ void RunAction::BeginOfRunAction(const G4Run* run) {
     }
 
     {
-        auto* sm = ExprsManager::Instance();
+        auto* sm = ScriptsManager::Instance();
         if (!sm->GetBlocks().empty()) sm->Reset();
     }
 
@@ -300,7 +307,7 @@ void RunAction::BeginOfRunAction(const G4Run* run) {
 /// Performs end-of-run finalization: chemistry state save, ROOT file
 /// write/close (unless externally managed), chemistry vector collection
 /// (Nc/Nt/Gc/Gt/charge per species from global ChemVoxel merge),
-/// VTK export of adaptive scoring grid results, EXPRS script execution
+/// VTK export of adaptive scoring grid results, SCRIPT.scripts execution
 /// with species vectors and SCRIPT constants, and weight-window
 /// statistics saving in collect mode.
 /// Only the master thread performs collection and export.
@@ -313,14 +320,33 @@ void RunAction::EndOfRunAction(const G4Run* run) {
     }
 
     auto* cfg = ConfigManager::Instance();
-    auto* man = G4AnalysisManager::Instance();
 
-    if (!fExternalFileMgmt) {
-        man->Write();
-        man->CloseFile();
+    // Close per-thread RNTuple streams (all threads).
+    {
+        auto* om = BeamAnalysis::Instance()->GetOutputManager();
+        if (om && om->IsEnabled()) om->EndOfRun();
     }
 
     if (!G4Threading::IsMasterThread()) return;
+
+    // Merge per-thread RNTuple files into the final output (master only).
+    {
+        auto* om = BeamAnalysis::Instance()->GetOutputManager();
+        if (om && om->IsEnabled()) {
+            std::string outFile = om->GetOutFile();
+            auto dot = outFile.rfind('.');
+            std::string stem = (dot == std::string::npos) ? outFile : outFile.substr(0, dot);
+            std::string ext  = (dot == std::string::npos) ? "" : outFile.substr(dot);
+            std::vector<std::string> threadFiles;
+            size_t nThreads = G4Threading::GetNumberOfRunningWorkerThreads();
+            if (nThreads == 0) nThreads = 1;
+            for (size_t t = 0; t < nThreads; ++t) threadFiles.push_back(stem + "_t" + std::to_string(t) + ext);
+            om->MergeFiles(outFile, threadFiles);
+        }
+    }
+
+    // ── RTDOSE: merge per-thread energy grids into the global dose grid ──
+    DoseScorer::Instance()->EndOfRun();
 
     // ── Chemistry: collect per-species vectors ──
     {
@@ -402,15 +428,15 @@ void RunAction::EndOfRunAction(const G4Run* run) {
         }
     }
 
-    // ── EXPRS: execute SCRIPT blocks ──
+    // ── SCRIPT.scripts: execute blocks ──
     {
-        auto* sm = ExprsManager::Instance();
+        auto* sm = ScriptsManager::Instance();
         const auto& blocks = sm->GetBlocks();
         if (!blocks.empty()) {
             sm->Merge();
             std::map<std::string, double> lastValues;
             G4cout << std::scientific << std::setprecision(15);
-            G4cout << "=== EXPRS: Executing " << blocks.size() << " block(s) ===" << G4endl;
+            G4CARE_LOG(1, "=== SCRIPT.scripts: Executing " << blocks.size() << " block(s) ===");
             ExpressionEvaluator eval;
             for (const auto& block : blocks) {
                 auto values = sm->GetBlockValues(block);
@@ -434,17 +460,23 @@ void RunAction::EndOfRunAction(const G4Run* run) {
                             compiledLine->chemCharge.assign(fChemCharge.begin(), fChemCharge.end());
                         }
                     }
-                    G4cout << "[RunAction] ChemVec: n=" << chem_n
+                    G4CARE_LOG(1, "[RunAction] ChemVec: n=" << chem_n
                            << " edep_eV=" << fChemEdepEV
                            << " Nc[0]=" << (fChemNc.empty() ? -1 : fChemNc[0])
                            << " Nt[0]=" << (fChemNt.empty() ? -1 : fChemNt[0])
-                           << G4endl;
+);
                     values["chem_n_species"] = static_cast<double>(chem_n);
                     values["chem_edep_eV"]   = fChemEdepEV;
                     values["chem_end_ns"]    = fChemEndNS;
                 }
 
                 for (const auto& compiledLine : block.compiledScripts) {
+                    if (compiledLine) {
+                        ExpressionEvaluator::SetStringVar(compiledLine.get(), "volume_name", block.volumes.empty() ? "" : block.volumes[0]->GetName());
+                        ExpressionEvaluator::SetStringVar(compiledLine.get(), "material_name", (block.volumes.empty() || !block.volumes[0]->GetMaterial()) ? "" : block.volumes[0]->GetMaterial()->GetName());
+                        ExpressionEvaluator::SetStringVar(compiledLine.get(), "particle_name", ScriptsManager::GetParticleName());
+                        ExpressionEvaluator::SetStringVar(compiledLine.get(), "process_name", ScriptsManager::GetProcessName());
+                    }
                     eval.Execute(compiledLine.get(), values);
                     if (compiledLine) {
                         for (const auto& [vname, vptr] : compiledLine->varPtrs) {
@@ -456,13 +488,7 @@ void RunAction::EndOfRunAction(const G4Run* run) {
                     }
                 }
             }
-            // ── Write user variables to ROOT ──
-            if (!lastValues.empty()) {
-                auto* bm = BeamAnalysis::Instance();
-                if (bm) bm->Fill("exprs_user", lastValues);
-            }
-            G4cout << "=== EXPRS: Done ===" << G4endl;
-            sm->ExecuteRunScripts();
+            G4CARE_LOG(1, "=== SCRIPT.scripts: Done ===");
             sm->Reset();
         }
     }

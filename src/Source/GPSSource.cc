@@ -64,6 +64,6 @@ void GPSSource::GeneratePrimaries(G4Event* event) {
         event->GetNumberOfPrimaryVertex() - 1);
     if (vertex && vertex->GetNumberOfParticle() > 0) {
         G4PrimaryParticle* particle = vertex->GetPrimary(0);
-        BeamAnalysis::Instance()->Fill("primary", UnifiedSource(vertex, particle));
+        BeamAnalysis::Instance()->Fill("primary", UnifiedSource(vertex, particle, fName));
     }
 }

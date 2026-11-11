@@ -31,6 +31,8 @@
 #include "G4VUserPrimaryGeneratorAction.hh"
 #include "SourceManager.hh"
 #include <memory>
+#include <string>
+#include <vector>
 
 class ObjectManager;
 
@@ -44,13 +46,35 @@ public:
     PrimaryGeneratorAction(ObjectManager* objMgr);
     virtual ~PrimaryGeneratorAction();
 
+    /// @brief Most-recently constructed instance (used by the source sampler).
+    static PrimaryGeneratorAction* Instance() { return fgInstance; }
+
     /// @brief Delegate primary vertex generation to SourceManager.
     virtual void GeneratePrimaries(G4Event*) override;
 
     /// @brief Apply GPS macros before first event (reserved for future use).
     void ApplyMacros();
 
+    /// @brief One sampled primary particle (GUI source preview).
+    struct SampledPrimary {
+        double x = 0, y = 0, z = 0;      // position (mm)
+        double dx = 0, dy = 0, dz = 0;   // direction (unit vector)
+        double energy = 0;               // kinetic energy (MeV)
+        double time = 0;                 // emission time (ns)
+        double weight = 1;               // particle weight
+        std::string particle;            // particle name
+    };
+
+    /// @brief Sample N primaries from one source by name (SOURCE.<name> key).
+    /// @param name  Source name (the SOURCE subsection key).
+    /// @param n     Number of primaries to generate.
+    /// @param found Optional output: set to true if the source exists.
+    /// @return      Sampled primaries (empty if the source was not found or
+    ///              produced no valid primaries — check @p found to distinguish).
+    std::vector<SampledPrimary> SampleSource(const std::string& name, int n, bool* found = nullptr);
+
 private:
+    static PrimaryGeneratorAction* fgInstance;
     std::unique_ptr<SourceManager> fSourceManager;
 };
 
